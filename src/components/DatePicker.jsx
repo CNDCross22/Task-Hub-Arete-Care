@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Calendar as CalIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import Popover from './Popover'
-import { toKey, fromKey, MONTHS, WEEKDAYS, longDate } from '@/lib/dates'
+import { toKey, fromKey, MONTHS, WEEKDAYS, medDate } from '@/lib/dates'
 
 const triggerCls =
   'flex w-full items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-left text-sm outline-none hover:border-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100'
@@ -13,11 +13,9 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       renderTrigger={({ open }) => (
         <button type="button" onClick={open} className={triggerCls}>
           <CalIcon size={15} className="shrink-0 text-slate-400" />
-          {value ? (
-            <span className="text-slate-800">{longDate(value)}</span>
-          ) : (
-            <span className="text-slate-400">{placeholder}</span>
-          )}
+          <span className={`min-w-0 truncate ${value ? 'text-slate-800' : 'text-slate-400'}`}>
+            {value ? medDate(value) : placeholder}
+          </span>
         </button>
       )}
     >

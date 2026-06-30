@@ -40,6 +40,13 @@ export const longDate = (key) => {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
+// "Jun 22, 2026" — compact, fits narrow fields on one line
+export const medDate = (key) => {
+  if (!key) return ''
+  const d = fromKey(key)
+  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`
+}
+
 // Monday–Friday of the work week containing today, shifted by offsetWeeks
 // (0 = this week, -1 = last week). Returns local YYYY-MM-DD keys.
 export const workWeekRange = (offsetWeeks = 0) => {
