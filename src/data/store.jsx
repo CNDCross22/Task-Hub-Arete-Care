@@ -31,12 +31,14 @@ function completionStamp(prevStatus, prevCompletedAt, nextStatus) {
   return null
 }
 
-// Recurrence: advance a date by one interval.
+// Recurrence: the date N intervals after a fixed anchor. Computed from the
+// original anchor (not chained occurrence-to-occurrence) so a monthly task on
+// the 31st returns to the 31st in long months instead of drifting to the 28th.
 const RECUR_DAYS = { daily: 1, weekly: 7, biweekly: 14 }
-const nextDate = (key, recurrence) => {
+const addRecurrence = (key, recurrence, n) => {
   if (!key) return key
-  if (recurrence === 'monthly') return addMonths(key, 1)
-  return addDays(key, RECUR_DAYS[recurrence] || 7)
+  if (recurrence === 'monthly') return addMonths(key, n)
+  return addDays(key, (RECUR_DAYS[recurrence] || 7) * n)
 }
 
 // Fields that stay per-occurrence and are never copied across a series edit.
@@ -55,17 +57,15 @@ function buildSeries(task) {
   const max = SERIES_COUNT[task.recurrence] || 12
   const { id, createdAt, sortIndex, ...rest } = task
   const out = []
-  let s = task.startDate
-  let d = task.dueDate
-  for (let i = 0; i < max; i++) {
-    s = s ? nextDate(s, task.recurrence) : ''
-    d = d ? nextDate(d, task.recurrence) : ''
+  for (let i = 1; i <= max; i++) {
+    const s = task.startDate ? addRecurrence(task.startDate, task.recurrence, i) : ''
+    const d = task.dueDate ? addRecurrence(task.dueDate, task.recurrence, i) : ''
     const probe = d || s
     if (!probe || probe > horizon) break
     out.push({
       ...rest,
-      id: `t_${Math.random().toString(36).slice(2, 10)}`,
-      createdAt: new Date().toISOString(),
+      id: uid('t'),
+      createdAt: nowIso(),
       startDate: s,
       dueDate: d,
       completedAt: null,
@@ -80,8 +80,13 @@ export function DataProvider({ children }) {
   const [tasks, setTasks] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [busyCount, setBusyCount] = useState(0)
   const toast = useToast()
+
+  // Re-run the initial fetch (used by the load-error screen's Retry button).
+  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
   // Shared task editor modal state (used by Topbar, Tasks, Kanban, etc.)
   const [modal, setModal] = useState({ open: false, mode: 'create', task: null })
@@ -107,28 +112,45 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     let active = true
-    backend.getAll().then((db) => {
-      if (!active) return
-      // Backfill completedAt for previously-completed tasks (one-time migration).
-      const raw = db.tasks || []
-      let changed = false
-      const migrated = raw.map((t) => {
-        if (t.status === 'completed' && !t.completedAt) {
-          changed = true
-          return { ...t, completedAt: t.dueDate || t.createdAt }
-        }
-        return t
+    setLoading(true)
+    setLoadError(null)
+    backend
+      .getAll()
+      .then((db) => {
+        if (!active) return
+        // One-time migrations: backfill completedAt for old completed tasks, and
+        // a seriesId for any recurring task created before series linking existed
+        // (so it collapses to a series row and offers the this/all-occurrence edit).
+        const raw = db.tasks || []
+        let changed = false
+        const migrated = raw.map((t) => {
+          let next = t
+          if (next.status === 'completed' && !next.completedAt) {
+            next = { ...next, completedAt: next.dueDate || next.createdAt }
+            changed = true
+          }
+          if (next.recurring && !next.seriesId) {
+            next = { ...next, seriesId: uid('s') }
+            changed = true
+          }
+          return next
+        })
+        setProjects(db.projects || [])
+        setTasks(migrated)
+        setMembers(db.members || [])
+        setLoading(false)
+        if (changed) backend.replace('tasks', migrated).catch(() => {})
       })
-      setProjects(db.projects || [])
-      setTasks(migrated)
-      setMembers(db.members || [])
-      setLoading(false)
-      if (changed) backend.replace('tasks', migrated)
-    })
+      .catch((e) => {
+        // A failed first fetch must not leave the app stuck on the loading screen.
+        if (!active) return
+        setLoadError(e)
+        setLoading(false)
+      })
     return () => {
       active = false
     }
-  }, [])
+  }, [reloadKey])
 
   const createTask = useCallback(
     (data) =>
@@ -441,6 +463,8 @@ export function DataProvider({ children }) {
       tasks,
       members,
       loading,
+      loadError,
+      reload,
       busy: busyCount > 0,
       createTask,
       updateTask,
@@ -466,6 +490,8 @@ export function DataProvider({ children }) {
       tasks,
       members,
       loading,
+      loadError,
+      reload,
       busyCount,
       createTask,
       updateTask,

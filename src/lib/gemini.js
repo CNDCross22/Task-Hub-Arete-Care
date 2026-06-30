@@ -7,6 +7,7 @@
 
 import { STATUSES, PRIORITIES, COMPANIES, DEPARTMENTS } from '@/data/config'
 import { hasEdgeConfig, aiViaEdge } from '@/data/backend/edgeBackend'
+import { todayStr } from '@/lib/dates'
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
@@ -54,8 +55,6 @@ export async function generateText(prompt, { model = MODEL, signal } = {}) {
   if (!text) throw new Error('Gemini returned no text (response may have been blocked).')
   return text
 }
-
-const todayStr = () => new Date().toISOString().slice(0, 10)
 
 // Compact, token-light snapshot of the task data for the model.
 export function buildSnapshot(tasks, members = []) {

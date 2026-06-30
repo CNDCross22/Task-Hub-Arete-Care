@@ -13,7 +13,8 @@ import Admin from '@/pages/Admin'
 import Settings from '@/pages/Settings'
 
 export default function App() {
-  const { loading } = useData()
+  const { loading, loadError, reload } = useData()
+  if (loadError) return <LoadingScreen error={loadError} onRetry={reload} />
   if (loading) return <LoadingScreen />
   return (
     <Layout>

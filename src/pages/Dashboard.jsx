@@ -4,8 +4,7 @@ import { useData } from '@/data/store'
 import { STATUSES, statusMeta, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
-
-const todayStr = () => new Date().toISOString().slice(0, 10)
+import { todayStr } from '@/lib/dates'
 
 export default function Dashboard() {
   const { tasks, openEditTask, loading } = useData()

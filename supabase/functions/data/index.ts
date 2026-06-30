@@ -19,6 +19,11 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Only these tables may ever be addressed by the client. Without this, the
+// caller-supplied `collection` would flow straight into admin.from(collection),
+// letting any member read/write arbitrary tables the service role can reach.
+const ALLOWED_COLLECTIONS = new Set(['projects', 'tasks', 'members'])
+
 const admin = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -63,6 +68,8 @@ Deno.serve(async (req) => {
   // Managing people requires admin.
   const needsAdmin = collection === 'members'
   const guard = () => needsAdmin && !isAdmin
+  // Reject any collection that isn't an explicitly allowed table.
+  const badCollection = () => !ALLOWED_COLLECTIONS.has(collection)
 
   try {
     switch (action) {
@@ -86,20 +93,25 @@ Deno.serve(async (req) => {
       }
 
       case 'create': {
+        if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
+        if (!item || typeof item !== 'object') return json({ error: 'Invalid item' }, 400)
         const { error } = await admin.from(collection).insert(item)
         if (error) throw error
         return json({ ok: true })
       }
 
       case 'update': {
+        if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
+        if (!patch || typeof patch !== 'object') return json({ error: 'Invalid patch' }, 400)
         const { error } = await admin.from(collection).update(patch).eq('id', id)
         if (error) throw error
         return json({ ok: true })
       }
 
       case 'remove': {
+        if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
         const { error } = await admin.from(collection).delete().eq('id', id)
         if (error) throw error
@@ -107,7 +119,9 @@ Deno.serve(async (req) => {
       }
 
       case 'replace': {
+        if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
+        if (!Array.isArray(items)) return json({ error: 'items must be an array' }, 400)
         const rows = collection === 'tasks' ? items.map((it: any, i: number) => ({ ...it, sortIndex: i })) : items
         const { error } = await admin.from(collection).upsert(rows)
         if (error) throw error

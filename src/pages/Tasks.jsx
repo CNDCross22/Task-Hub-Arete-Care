@@ -6,8 +6,7 @@ import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
 import Select from '@/components/Select'
-
-const todayStr = () => new Date().toISOString().slice(0, 10)
+import { todayStr } from '@/lib/dates'
 
 export default function Tasks() {
   const { tasks, openNewTask, openEditTask, loading } = useData()
