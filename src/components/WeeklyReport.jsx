@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Loader2, RefreshCw, Sparkles, FileType2, FileDown } from 'lucide-react'
+import { FileText, Loader2, RefreshCw, Sparkles, FileType2, FileDown, CalendarX2 } from 'lucide-react'
 import { useData } from '@/data/store'
 import { generateWeeklyReport } from '@/lib/weeklyReport'
 import { isAIConfigured } from '@/lib/gemini'
@@ -12,7 +12,7 @@ const TITLE = 'IT & Marketing Weekly Report'
 export default function WeeklyReport() {
   const { tasks, members } = useData()
   const [week, setWeek] = useState(0) // 0 = this week, -1 = last week
-  const [state, setState] = useState({ text: '', loading: false, error: '', range: null })
+  const [state, setState] = useState({ text: '', empty: false, loading: false, error: '', range: null })
   const [exporting, setExporting] = useState('')
 
   const preview = workWeekRange(week)
@@ -24,8 +24,8 @@ export default function WeeklyReport() {
   const generate = async () => {
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const { text, range } = await generateWeeklyReport(tasks, { offsetWeeks: week, members })
-      setState({ text, loading: false, error: '', range })
+      const { text, range, empty } = await generateWeeklyReport(tasks, { offsetWeeks: week, members })
+      setState({ text, empty: !!empty, loading: false, error: '', range })
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e.message || 'Something went wrong.' }))
     }
@@ -71,7 +71,7 @@ export default function WeeklyReport() {
                 onClick={() => {
                   if (week !== o.v) {
                     setWeek(o.v)
-                    setState({ text: '', loading: false, error: '', range: null })
+                    setState({ text: '', empty: false, loading: false, error: '', range: null })
                   }
                 }}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -134,6 +134,23 @@ export default function WeeklyReport() {
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Loader2 size={16} className="animate-spin" />
             Writing this week's report from {tasks.length} tasks…
+          </div>
+        )}
+
+        {state.empty && !state.loading && (
+          <div className="mt-2 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-6 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+              <CalendarX2 size={24} />
+            </div>
+            <h4 className="mt-4 text-base font-semibold text-slate-700">No completed work this week</h4>
+            <p className="mt-1 max-w-md text-sm text-slate-500">
+              Nothing was marked complete for{' '}
+              <span className="font-medium text-slate-600">
+                {longDate(activeRange.startKey || activeRange.from)} – {longDate(activeRange.endKey || activeRange.to)}
+              </span>
+              . Mark tasks as <span className="font-medium text-slate-600">Completed</span> and they'll appear
+              here, grouped by department, company, and category.
+            </p>
           </div>
         )}
 

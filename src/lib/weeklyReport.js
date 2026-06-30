@@ -45,15 +45,11 @@ export function buildWeeklySnapshot(tasks, members = [], offsetWeeks = 0) {
 export async function generateWeeklyReport(tasks, { offsetWeeks = 0, members = [], ...opts } = {}) {
   const snapshot = buildWeeklySnapshot(tasks, members, offsetWeeks)
 
-  // No completed work this week — return a friendly note instead of asking the
-  // AI to summarize an empty list (which produces an awkward apology) and
-  // wasting a request.
+  // No completed work this week — signal an empty state to the UI instead of
+  // asking the AI to summarize an empty list (which produces an awkward
+  // apology) and wasting a request.
   if (snapshot.totalCompleted === 0) {
-    return {
-      text: '_No tasks were completed during this reporting week. Once tasks are marked **completed**, this report will summarize them — grouped by department, company, and category._',
-      range: snapshot.range,
-      snapshot,
-    }
+    return { text: '', empty: true, range: snapshot.range, snapshot }
   }
 
   const prompt = `You are an operations associate compiling the team's WEEKLY REPORT covering IT and Marketing work across several companies.
