@@ -65,10 +65,10 @@ export default function TaskModal() {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in sm:p-8">
       <form
         onSubmit={handleSave}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-2 ring-slate-900/80"
+        className="my-2 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 animate-scale-in"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pb-2 pt-5">

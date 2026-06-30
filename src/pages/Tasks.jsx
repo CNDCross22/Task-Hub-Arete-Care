@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Calendar as CalIcon } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
+import Pagination from '@/components/Pagination'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
@@ -14,6 +15,8 @@ export default function Tasks() {
   const [priority, setPriority] = useState('all')
   const [department, setDepartment] = useState('all')
   const [company, setCompany] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -27,6 +30,17 @@ export default function Tasks() {
       return true
     })
   }, [tasks, q, status, priority, department, company])
+
+  // Reset to page 1 whenever the filtered set changes.
+  useEffect(() => {
+    setPage(1)
+  }, [q, status, priority, department, company, pageSize])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
@@ -76,7 +90,7 @@ export default function Tasks() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((t) => {
+            {paged.map((t) => {
               const sm = statusMeta(t.status)
               const pm = priorityMeta(t.priority)
               const overdue = t.status !== 'completed' && t.dueDate && t.dueDate < todayStr()
@@ -121,6 +135,14 @@ export default function Tasks() {
             )}
           </tbody>
         </table>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          total={filtered.length}
+          pageSize={pageSize}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
       </div>
     </div>
   )

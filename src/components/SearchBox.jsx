@@ -42,7 +42,7 @@ export default function SearchBox() {
       />
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 z-20 mt-2 origin-top animate-fade-in-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
           {results.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-slate-400">No tasks match “{q.trim()}”.</p>
           ) : (
