@@ -250,12 +250,16 @@ export default function TaskModal() {
               <Toggle on={form.recurring} onChange={(v) => set('recurring', v)} />
             </div>
             {form.recurring && (
-              <div className="mt-3">
+              <div className="mt-3 space-y-2">
                 <Select
                   value={form.recurrence}
                   onChange={(v) => set('recurrence', v)}
                   options={RECURRENCES.map((r) => ({ value: r.key, label: r.label }))}
                 />
+                <p className="text-xs text-slate-500">
+                  When this task is completed, the next one is created automatically with its dates
+                  moved ahead.
+                </p>
               </div>
             )}
           </div>

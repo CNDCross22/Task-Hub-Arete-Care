@@ -15,6 +15,12 @@ export const addDays = (key, n) => {
   return toKey(d)
 }
 
+export const addMonths = (key, n) => {
+  const d = fromKey(key)
+  d.setMonth(d.getMonth() + n)
+  return toKey(d)
+}
+
 export const fromKey = (key) => {
   const [y, m, d] = key.split('-').map(Number)
   return new Date(y, m - 1, d)

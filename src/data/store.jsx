@@ -5,6 +5,7 @@ import { createEdgeBackend, hasEdgeConfig } from './backend/edgeBackend'
 import { hasSupabaseConfig } from './backend/supabaseClient'
 import { seedData } from './seed'
 import { TASK_DEFAULTS } from './config'
+import { addDays, addMonths } from '@/lib/dates'
 
 // Backend priority:
 //   edge     — secure Edge Function proxy (RLS on; service key server-side)
@@ -27,6 +28,26 @@ const nowIso = () => new Date().toISOString()
 function completionStamp(prevStatus, prevCompletedAt, nextStatus) {
   if (nextStatus === 'completed') return prevCompletedAt || nowIso()
   return null
+}
+
+// Recurrence: advance a date by one interval.
+const RECUR_DAYS = { daily: 1, weekly: 7, biweekly: 14 }
+const nextDate = (key, recurrence) => {
+  if (!key) return key
+  if (recurrence === 'monthly') return addMonths(key, 1)
+  return addDays(key, RECUR_DAYS[recurrence] || 7)
+}
+
+// Build the next occurrence of a recurring task (fresh, dates advanced).
+function nextOccurrence(task) {
+  const { id, createdAt, sortIndex, ...rest } = task
+  return {
+    ...rest,
+    status: 'pending',
+    completedAt: null,
+    startDate: nextDate(task.startDate, task.recurrence),
+    dueDate: nextDate(task.dueDate, task.recurrence),
+  }
 }
 
 export function DataProvider({ children }) {
@@ -87,17 +108,23 @@ export function DataProvider({ children }) {
   const updateTask = useCallback(
     async (id, patch) => {
       let finalPatch = patch
+      let spawn = null
       if ('status' in patch) {
         const existing = tasks.find((t) => t.id === id)
         finalPatch = {
           ...patch,
           completedAt: completionStamp(existing?.status, existing?.completedAt, patch.status),
         }
+        // Completing a recurring task spawns its next occurrence.
+        if (patch.status === 'completed' && existing?.status !== 'completed' && existing?.recurring) {
+          spawn = existing
+        }
       }
       await backend.update('tasks', id, finalPatch)
       setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...finalPatch } : x)))
+      if (spawn) await createTask(nextOccurrence(spawn))
     },
-    [tasks],
+    [tasks, createTask],
   )
 
   const removeTask = useCallback(async (id) => {
@@ -148,8 +175,13 @@ export function DataProvider({ children }) {
 
       setTasks(arr)
       await backend.replace('tasks', arr)
+
+      // Dragging a recurring task to Completed spawns its next occurrence.
+      if (newStatus === 'completed' && moving.status !== 'completed' && moving.recurring) {
+        await createTask(nextOccurrence(moving))
+      }
     },
-    [tasks],
+    [tasks, createTask],
   )
 
   const createProject = useCallback(async (data) => {
