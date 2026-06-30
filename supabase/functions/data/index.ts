@@ -7,6 +7,9 @@
 //
 // Deploy:  supabase functions deploy data --no-verify-jwt
 // (we do our own auth via the access code, not Supabase Auth JWTs)
+//
+// Secret needed for the AI proxy (Dashboard → Edge Functions → Secrets, or
+// `supabase secrets set GEMINI_API_KEY=...`):  GEMINI_API_KEY
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -109,6 +112,36 @@ Deno.serve(async (req) => {
         const { error } = await admin.from(collection).upsert(rows)
         if (error) throw error
         return json({ ok: true })
+      }
+
+      case 'ai': {
+        const geminiKey = Deno.env.get('GEMINI_API_KEY')
+        if (!geminiKey) return json({ error: 'AI is not configured on the server.' }, 500)
+        const model = payload.model || 'gemini-2.5-flash'
+        const generationConfig: Record<string, unknown> = { temperature: 0.4, maxOutputTokens: 2048 }
+        if (String(model).includes('2.5')) generationConfig.thinkingConfig = { thinkingBudget: 0 }
+
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: payload.prompt }] }], generationConfig }),
+          },
+        )
+        if (!r.ok) {
+          let detail = ''
+          try {
+            detail = (await r.json())?.error?.message || ''
+          } catch {
+            /* ignore */
+          }
+          return json({ error: `Gemini error ${r.status}${detail ? `: ${detail}` : ''}` }, 502)
+        }
+        const d = await r.json()
+        const text = d?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') || ''
+        if (!text) return json({ error: 'Gemini returned no text.' }, 502)
+        return json({ text })
       }
 
       default:

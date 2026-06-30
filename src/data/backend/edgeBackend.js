@@ -64,3 +64,9 @@ export async function loginWithCode(code) {
   const { member } = await call('login', {}, code)
   return member
 }
+
+// AI proxy — the Gemini key stays server-side in the function.
+export async function aiViaEdge(prompt, model) {
+  const { text } = await call('ai', { prompt, model })
+  return text
+}

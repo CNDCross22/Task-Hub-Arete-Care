@@ -6,14 +6,19 @@
 // the call sites (Reports / Weekly Report) change to invoke the function URL.
 
 import { STATUSES, PRIORITIES, COMPANIES, DEPARTMENTS } from '@/data/config'
+import { hasEdgeConfig, aiViaEdge } from '@/data/backend/edgeBackend'
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-export const isAIConfigured = () => Boolean(API_KEY)
+// In edge mode the key lives in the Edge Function, so the client doesn't need it.
+export const isAIConfigured = () => hasEdgeConfig || Boolean(API_KEY)
 
 export async function generateText(prompt, { model = MODEL, signal } = {}) {
+  // Edge mode: proxy through the Edge Function (Gemini key stays server-side).
+  if (hasEdgeConfig) return aiViaEdge(prompt, model)
+
   if (!API_KEY)
     throw new Error('Missing VITE_GEMINI_API_KEY — add it to .env.local and restart the dev server.')
 
