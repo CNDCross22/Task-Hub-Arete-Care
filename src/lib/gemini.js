@@ -104,6 +104,11 @@ export function buildSnapshot(tasks, members = []) {
 }
 
 export async function generateInsights(tasks, members = [], opts = {}) {
+  // Nothing to analyze — skip the AI round-trip and return a clear note.
+  if (tasks.length === 0) {
+    return '## Summary\nThere are no tasks yet, so there’s nothing to analyze. Add tasks to get insights on risks, bottlenecks, and workload.'
+  }
+
   const snapshot = buildSnapshot(tasks, members)
   const prompt = `You are an operations analyst for a cross-company task hub spanning the companies ${COMPANIES.join(
     ', ',

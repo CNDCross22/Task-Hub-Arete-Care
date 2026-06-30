@@ -21,7 +21,7 @@ export default function Settings() {
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       {/* Projects */}
       <Section icon={FolderKanban} title="Projects" subtitle="Group tasks into projects.">
         <ul className="divide-y divide-slate-100">
