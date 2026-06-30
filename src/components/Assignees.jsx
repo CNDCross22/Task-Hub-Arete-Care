@@ -1,5 +1,5 @@
 import { useData } from '@/data/store'
-import { resolveMembers, initialsOf } from '@/lib/members'
+import { resolveMembers, initialsOf, shortName } from '@/lib/members'
 
 // Overlapping avatar stack for a task's assignees, resolved against the real
 // members managed in the Admin portal. `max` caps shown avatars.
@@ -17,7 +17,7 @@ export default function Assignees({ ids, max = 3, size = 24 }) {
       {shown.map((m) => (
         <span
           key={m.id}
-          title={m.name}
+          title={shortName(m.name)}
           style={{ width: dim, height: dim }}
           className="flex items-center justify-center rounded-full bg-brand-100 text-[10px] font-semibold text-brand-700 ring-2 ring-white"
         >

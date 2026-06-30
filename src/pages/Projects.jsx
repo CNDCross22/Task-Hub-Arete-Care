@@ -1,46 +1,54 @@
 import { useMemo } from 'react'
-import { FolderKanban, Plus } from 'lucide-react'
+import { Building2, Plus } from 'lucide-react'
 import { useData } from '@/data/store'
-import { STATUSES, TONE, priorityMeta } from '@/data/config'
+import { STATUSES, TONE, COMPANIES, priorityMeta } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 
+// Each company gets a tone for its card accent.
+const COMPANY_TONES = ['blue', 'emerald', 'amber', 'rose', 'slate']
+
 export default function Projects() {
-  const { tasks, projects, openNewTask, openEditTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, loading } = useData()
 
   const summaries = useMemo(
     () =>
-      projects.map((p) => {
-        const items = tasks.filter((t) => t.projectId === p.id)
+      COMPANIES.map((company, i) => {
+        const items = tasks.filter((t) => t.company === company)
         const done = items.filter((t) => t.status === 'completed').length
         const pct = items.length ? Math.round((done / items.length) * 100) : 0
         const byStatus = STATUSES.map((s) => ({
           ...s,
           count: items.filter((t) => t.status === s.key).length,
         }))
-        return { project: p, items, done, pct, byStatus }
+        return { company, tone: COMPANY_TONES[i % COMPANY_TONES.length], items, done, pct, byStatus }
       }),
-    [tasks, projects],
+    [tasks],
   )
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      {summaries.map(({ project, items, done, pct, byStatus }) => (
-        <div key={project.id} className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+      {summaries.map(({ company, tone, items, done, pct, byStatus }) => (
+        <div
+          key={company}
+          className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+        >
           <div className="flex items-start gap-3 border-b border-slate-100 p-5">
-            <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[project.color]?.soft || TONE.slate.soft}`}>
-              <FolderKanban size={20} />
+            <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[tone].soft}`}>
+              <Building2 size={20} />
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-slate-900">{project.name}</h3>
-              <p className="truncate text-sm text-slate-500">{project.description || 'No description'}</p>
+              <h3 className="font-semibold text-slate-900">{company}</h3>
+              <p className="text-sm text-slate-500">
+                {items.length} task{items.length === 1 ? '' : 's'}
+              </p>
             </div>
             <button
-              onClick={() => openNewTask({ projectId: project.id })}
+              onClick={() => openNewTask({ company })}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              title="Add task to project"
+              title={`Add task for ${company}`}
             >
               <Plus size={18} />
             </button>
@@ -50,7 +58,9 @@ export default function Projects() {
             {/* Progress */}
             <div className="mb-1.5 flex items-center justify-between text-sm">
               <span className="font-medium text-slate-700">Progress</span>
-              <span className="text-slate-400">{done}/{items.length} done · {pct}%</span>
+              <span className="text-slate-400">
+                {done}/{items.length} done · {pct}%
+              </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
@@ -59,7 +69,10 @@ export default function Projects() {
             {/* Status chips */}
             <div className="mt-4 flex flex-wrap gap-2">
               {byStatus.map((s) => (
-                <span key={s.key} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${TONE[s.tone].badge}`}>
+                <span
+                  key={s.key}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${TONE[s.tone].badge}`}
+                >
                   <span className={`h-1.5 w-1.5 rounded-full ${TONE[s.tone].dot}`} />
                   {s.label} {s.count}
                 </span>
@@ -77,8 +90,12 @@ export default function Projects() {
                       onClick={() => openEditTask(t)}
                       className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
                     >
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${TONE[STATUSES.find((s) => s.key === t.status)?.tone || 'slate'].dot}`} />
-                      <span className={`min-w-0 flex-1 truncate text-sm ${t.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${TONE[STATUSES.find((s) => s.key === t.status)?.tone || 'slate'].dot}`}
+                      />
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm ${t.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}
+                      >
                         {t.title}
                       </span>
                       <Badge tone={pm.tone}>{pm.label}</Badge>
@@ -91,12 +108,6 @@ export default function Projects() {
           </div>
         </div>
       ))}
-
-      {projects.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
-          No projects yet. Add one in Settings.
-        </div>
-      )}
     </div>
   )
 }

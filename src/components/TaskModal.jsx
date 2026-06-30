@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronUp, Trash2, X, Plus } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
+import { shortName } from '@/lib/members'
 import { todayStr } from '@/lib/dates'
 import DatePicker from '@/components/DatePicker'
 import TimePicker from '@/components/TimePicker'
@@ -136,8 +137,9 @@ export default function TaskModal() {
                       <span
                         key={id}
                         className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2 pr-1 text-xs font-medium text-brand-700"
+                        title={m.name}
                       >
-                        {m.name}
+                        {shortName(m.name)}
                         <button
                           type="button"
                           onClick={() => removeAssignee(id)}
@@ -170,8 +172,9 @@ export default function TaskModal() {
                               type="button"
                               onClick={() => addAssignee(m.id)}
                               className="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100"
+                              title={m.name}
                             >
-                              {m.name}
+                              {shortName(m.name)}
                             </button>
                           ))
                         )}

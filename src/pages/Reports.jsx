@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Download, CheckCircle2, ListTodo, AlertTriangle, Activity, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 import { useData } from '@/data/store'
-import { STATUSES, PRIORITIES, TONE } from '@/data/config'
+import { STATUSES, PRIORITIES, COMPANIES, TONE } from '@/data/config'
 import { todayStr } from '@/lib/dates'
-import { initialsOf, memberNames } from '@/lib/members'
+import { initialsOf, memberNames, shortName } from '@/lib/members'
 import { generateInsights, isAIConfigured } from '@/lib/gemini'
 import Markdownish from '@/components/Markdownish'
 import WeeklyReport from '@/components/WeeklyReport'
 
 export default function Reports() {
-  const { tasks, projects, members, loading } = useData()
+  const { tasks, members, loading } = useData()
 
   // AI insights (Gemini)
   const [ai, setAi] = useState({ text: '', loading: false, error: '' })
@@ -34,16 +34,16 @@ export default function Reports() {
     const byPriority = PRIORITIES.map((p) => ({ label: p.label, tone: p.tone, count: tasks.filter((t) => t.priority === p.key).length }))
     const byAssignee = members.map((m) => {
       const items = tasks.filter((t) => (t.assignees || []).includes(m.id))
-      return { label: m.name, initials: initialsOf(m.name), count: items.length, done: items.filter((t) => t.status === 'completed').length }
+      return { label: shortName(m.name), initials: initialsOf(m.name), count: items.length, done: items.filter((t) => t.status === 'completed').length }
     }).filter((m) => m.count > 0)
-    const byProject = projects.map((p) => ({
-      label: p.name,
-      tone: p.color,
-      count: tasks.filter((t) => t.projectId === p.id).length,
+    const byCompany = COMPANIES.map((c) => ({
+      label: c,
+      tone: 'blue',
+      count: tasks.filter((t) => t.company === c).length,
     }))
 
-    return { total, done, overdue, completion, byStatus, byPriority, byAssignee, byProject }
-  }, [tasks, projects, members])
+    return { total, done, overdue, completion, byStatus, byPriority, byAssignee, byCompany }
+  }, [tasks, members])
 
   const exportCsv = () => {
     const headers = ['Title', 'Status', 'Priority', 'Assignees', 'Department', 'Company', 'Start Date', 'Due Date', 'Notes']
@@ -85,7 +85,7 @@ export default function Reports() {
       <WeeklyReport />
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Analytics across all tasks and projects</p>
+        <p className="text-sm text-slate-500">Analytics across all tasks and companies</p>
         <button
           onClick={exportCsv}
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -172,7 +172,7 @@ export default function Reports() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <BarCard title="By Status" rows={metrics.byStatus} total={metrics.total} />
         <BarCard title="By Priority" rows={metrics.byPriority} total={metrics.total} />
-        <BarCard title="By Project" rows={metrics.byProject} total={metrics.total} />
+        <BarCard title="By Company" rows={metrics.byCompany} total={metrics.total} />
 
         {/* Workload by assignee */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

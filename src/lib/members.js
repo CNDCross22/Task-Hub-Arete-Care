@@ -7,6 +7,13 @@ export const initialsOf = (name = '') => {
   return ini || String(name).slice(0, 2).toUpperCase() || '?'
 }
 
+// "Carlo Dizon" -> "Carlo D." — show first name + last initial, not the full name.
+export const shortName = (name = '') => {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return parts[0] || ''
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+
 // Returns member objects for the given ids (skips ids with no matching member).
 export const resolveMembers = (ids, members) => {
   const map = new Map((members || []).map((m) => [m.id, m]))
