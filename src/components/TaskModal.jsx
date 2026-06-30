@@ -3,6 +3,8 @@ import { ChevronUp, Trash2, X, Plus } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
 import { todayStr } from '@/lib/dates'
+import DatePicker from '@/components/DatePicker'
+import TimePicker from '@/components/TimePicker'
 
 const empty = {
   title: '',
@@ -207,16 +209,16 @@ export default function TaskModal() {
           {/* Dates + Times */}
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
             <Field label="Start Date">
-              <input type="date" value={form.startDate || ''} onChange={(e) => set('startDate', e.target.value)} className={input} />
+              <DatePicker value={form.startDate} onChange={(v) => set('startDate', v)} />
             </Field>
             <Field label="Due Date">
-              <input type="date" value={form.dueDate || ''} onChange={(e) => set('dueDate', e.target.value)} className={input} />
+              <DatePicker value={form.dueDate} onChange={(v) => set('dueDate', v)} />
             </Field>
             <Field label="Start Time">
-              <input type="time" value={form.startTime || ''} onChange={(e) => set('startTime', e.target.value)} className={input} />
+              <TimePicker value={form.startTime} onChange={(v) => set('startTime', v)} />
             </Field>
             <Field label="End Time">
-              <input type="time" value={form.endTime || ''} onChange={(e) => set('endTime', e.target.value)} className={input} />
+              <TimePicker value={form.endTime} onChange={(v) => set('endTime', v)} />
             </Field>
           </div>
 

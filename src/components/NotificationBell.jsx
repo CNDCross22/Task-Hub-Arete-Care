@@ -3,10 +3,12 @@ import { Bell, AlertTriangle, CalendarClock, BellRing } from 'lucide-react'
 import { useData } from '@/data/store'
 import { TONE, priorityMeta } from '@/data/config'
 import { todayStr, prettyDate } from '@/lib/dates'
+import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 
 export default function NotificationBell() {
   const { tasks, openEditTask } = useData()
   const [open, setOpen] = useState(false)
+  const { render, closing } = useAnimatedPresence(open)
   const [perm, setPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const today = todayStr()
 
@@ -62,10 +64,14 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {open && (
+      {render && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-2 w-80 origin-top-right animate-scale-in rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div
+            className={`absolute right-0 z-20 mt-2 w-80 origin-top-right rounded-xl border border-slate-200 bg-white shadow-lg ${
+              closing ? 'animate-scale-out' : 'animate-scale-in'
+            }`}
+          >
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
               <span className="text-sm font-semibold text-slate-800">Notifications</span>
               <span className="text-xs text-slate-400">{count} active</span>

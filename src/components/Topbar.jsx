@@ -5,6 +5,7 @@ import { useAuth, memberName, memberInitials } from '@/auth/AuthProvider'
 import AccessCodeForm from '@/auth/AccessCodeForm'
 import SearchBox from '@/components/SearchBox'
 import NotificationBell from '@/components/NotificationBell'
+import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 
 export default function Topbar({ title }) {
   const { openNewTask } = useData()
@@ -34,6 +35,7 @@ export default function Topbar({ title }) {
 function UserMenu() {
   const { enabled, member, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+  const { render, closing } = useAnimatedPresence(open)
 
   // Signed in — avatar with a dropdown.
   if (member) {
@@ -46,10 +48,14 @@ function UserMenu() {
         >
           {memberInitials(member)}
         </button>
-        {open && (
+        {render && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 z-20 mt-2 w-56 origin-top-right animate-scale-in rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            <div
+              className={`absolute right-0 z-20 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${
+                closing ? 'animate-scale-out' : 'animate-scale-in'
+              }`}
+            >
               <div className="border-b border-slate-100 px-3 py-2">
                 <p className="truncate text-sm font-medium text-slate-800">{memberName(member)}</p>
                 <p className="truncate text-xs capitalize text-slate-500">
@@ -85,10 +91,14 @@ function UserMenu() {
           <KeyRound size={16} />
           Sign in
         </button>
-        {open && (
+        {render && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 z-20 mt-2 w-64 origin-top-right animate-scale-in rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+            <div
+              className={`absolute right-0 z-20 mt-2 w-64 origin-top-right rounded-xl border border-slate-200 bg-white p-3 shadow-lg ${
+                closing ? 'animate-scale-out' : 'animate-scale-in'
+              }`}
+            >
               <AccessCodeForm autoFocus onDone={() => setOpen(false)} />
             </div>
           </>

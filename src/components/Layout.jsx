@@ -15,11 +15,9 @@ export default function Layout({ children }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={active.label} />
-        <main className="flex-1 overflow-y-auto p-6">
-          {/* Keyed by route so each page fades in on navigation */}
-          <div key={pathname} className="h-full animate-fade-in">
-            {children}
-          </div>
+        {/* Keyed by route so each page fades in on navigation; keeps p-6 on all sides */}
+        <main key={pathname} className="flex-1 animate-fade-in overflow-y-auto p-6">
+          {children}
         </main>
       </div>
       <TaskModal />

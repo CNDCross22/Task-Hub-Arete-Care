@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
+import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 
 export default function SearchBox() {
   const { tasks, openEditTask } = useData()
@@ -27,6 +28,7 @@ export default function SearchBox() {
   }
 
   const showDropdown = focused && q.trim().length > 0
+  const { render, closing } = useAnimatedPresence(showDropdown)
 
   return (
     <div className="relative hidden sm:block">
@@ -41,8 +43,12 @@ export default function SearchBox() {
         className="w-64 rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
       />
 
-      {showDropdown && (
-        <div className="absolute left-0 right-0 z-20 mt-2 origin-top animate-fade-in-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      {render && (
+        <div
+          className={`absolute left-0 right-0 z-20 mt-2 origin-top overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg ${
+            closing ? 'animate-fade-out' : 'animate-fade-in-up'
+          }`}
+        >
           {results.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-slate-400">No tasks match “{q.trim()}”.</p>
           ) : (
