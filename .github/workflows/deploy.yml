@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Test
+        run: npm run test:run
       - name: Build
         # Config comes from the committed .env.production (safe: publishable key
         # only, RLS-protected; no Gemini key in the bundle).
