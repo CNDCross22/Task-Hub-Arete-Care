@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock } from 'lucide-react'
 import { useData } from '@/data/store'
 import { useAuth } from '@/auth/AuthProvider'
@@ -78,12 +78,12 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
             placeholder="Full name"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-3"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-2"
           />
           <select
             value={form.department}
             onChange={(e) => set('department', e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-2"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-3"
           >
             {DEPARTMENTS.map((d) => (
               <option key={d} value={d}>{d}</option>
@@ -142,6 +142,7 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
               <MemberRow
                 key={m.id}
                 m={m}
+                all={members}
                 isSelf={m.id === me?.id}
                 onUpdate={updateMember}
                 onRemove={removeMember}
@@ -165,8 +166,32 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
   )
 }
 
-function MemberRow({ m, isSelf, onUpdate, onRemove }) {
+function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
+  const [name, setName] = useState(m.name)
+  const [code, setCode] = useState(m.accessCode)
+  const [err, setErr] = useState('')
   const [copied, setCopied] = useState(false)
+
+  // Re-sync drafts if the underlying record changes.
+  useEffect(() => {
+    setName(m.name)
+    setCode(m.accessCode)
+  }, [m.name, m.accessCode])
+
+  const saveName = () => {
+    const v = name.trim()
+    if (!v) return setName(m.name)
+    if (v !== m.name) onUpdate(m.id, { name: v })
+  }
+
+  const saveCode = () => {
+    const v = code.trim()
+    if (!v) return setErr('Code required')
+    if (v === m.accessCode) return setErr('')
+    if (all.some((x) => x.id !== m.id && x.accessCode === v)) return setErr('Code already in use')
+    setErr('')
+    onUpdate(m.id, { accessCode: v })
+  }
 
   const copy = () => {
     navigator.clipboard?.writeText(m.accessCode)
@@ -175,10 +200,18 @@ function MemberRow({ m, isSelf, onUpdate, onRemove }) {
   }
 
   return (
-    <tr className="hover:bg-slate-50">
-      <td className="px-4 py-3 font-medium text-slate-800">
-        {m.name}
-        {isSelf && <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>}
+    <tr className="align-top hover:bg-slate-50">
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            className="w-40 rounded border border-transparent px-1.5 py-1 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-brand-400 focus:bg-white focus:outline-none"
+          />
+          {isSelf && <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>}
+        </div>
       </td>
       <td className="px-4 py-3">
         <select
@@ -191,14 +224,48 @@ function MemberRow({ m, isSelf, onUpdate, onRemove }) {
           <option value="admin">admin</option>
         </select>
       </td>
-      <td className="px-4 py-3 text-slate-600">{m.department || '—'}</td>
       <td className="px-4 py-3">
-        <div className="inline-flex items-center gap-1.5">
-          <code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">{m.accessCode}</code>
+        <select
+          value={m.department || ''}
+          onChange={(e) => onUpdate(m.id, { department: e.target.value })}
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-brand-400"
+        >
+          {DEPARTMENTS.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1">
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onBlur={saveCode}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            className={`w-32 rounded border px-2 py-1 font-mono text-xs outline-none focus:ring-2 focus:ring-brand-100 ${
+              err ? 'border-rose-300 bg-rose-50' : 'border-slate-200 focus:border-brand-400'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const taken = new Set(all.filter((x) => x.id !== m.id).map((x) => x.accessCode))
+              let next = genCode()
+              while (taken.has(next)) next = genCode()
+              setCode(next)
+              setErr('')
+              onUpdate(m.id, { accessCode: next })
+            }}
+            title="Generate new code"
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            <RefreshCw size={14} />
+          </button>
           <button onClick={copy} title="Copy" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
           </button>
         </div>
+        {err && <p className="mt-1 text-[11px] text-rose-600">{err}</p>}
       </td>
       <td className="px-4 py-3">
         <button

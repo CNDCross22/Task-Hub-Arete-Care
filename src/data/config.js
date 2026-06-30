@@ -18,7 +18,7 @@ export const PRIORITIES = [
 // Cross-company operations: tasks belong to a company and a department.
 export const COMPANIES = ['Arete Care', 'TFO PH', 'TFO India', 'Mamta Face Yoga', 'Raaehi']
 
-export const DEPARTMENTS = ['IT', 'Marketing']
+export const DEPARTMENTS = ['IT', 'Marketing', 'Community Partnership']
 
 export const RECURRENCES = [
   { key: 'daily', label: 'Daily' },
