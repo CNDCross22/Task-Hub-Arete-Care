@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Plus, Trash2, FolderKanban, Users, Tag, Flag, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, FolderKanban, Tag, Flag, AlertTriangle } from 'lucide-react'
 import { useData, BACKEND_MODE } from '@/data/store'
-import { STATUSES, PRIORITIES, MEMBERS, TONE } from '@/data/config'
+import { STATUSES, PRIORITIES, TONE } from '@/data/config'
 
 const COLORS = ['blue', 'emerald', 'amber', 'rose', 'slate']
 
@@ -71,20 +71,6 @@ export default function Settings() {
             Add
           </button>
         </form>
-      </Section>
-
-      {/* Team */}
-      <Section icon={Users} title="Team Members" subtitle="People tasks can be assigned to.">
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {MEMBERS.map((m) => (
-            <li key={m.id} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-                {m.initials}
-              </span>
-              <span className="text-sm text-slate-700">{m.name}</span>
-            </li>
-          ))}
-        </ul>
       </Section>
 
       {/* Statuses + Priorities */}

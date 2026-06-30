@@ -1,21 +1,22 @@
 import { useMemo, useState } from 'react'
 import { Download, CheckCircle2, ListTodo, AlertTriangle, Activity, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 import { useData } from '@/data/store'
-import { STATUSES, PRIORITIES, MEMBERS, TONE, memberMeta } from '@/data/config'
+import { STATUSES, PRIORITIES, TONE } from '@/data/config'
 import { todayStr } from '@/lib/dates'
+import { initialsOf, memberNames } from '@/lib/members'
 import { generateInsights, isAIConfigured } from '@/lib/gemini'
 import Markdownish from '@/components/Markdownish'
 import WeeklyReport from '@/components/WeeklyReport'
 
 export default function Reports() {
-  const { tasks, projects, loading } = useData()
+  const { tasks, projects, members, loading } = useData()
 
   // AI insights (Gemini)
   const [ai, setAi] = useState({ text: '', loading: false, error: '' })
   const runInsights = async () => {
     setAi({ text: '', loading: true, error: '' })
     try {
-      const text = await generateInsights(tasks)
+      const text = await generateInsights(tasks, members)
       setAi({ text, loading: false, error: '' })
     } catch (e) {
       setAi({ text: '', loading: false, error: e.message || 'Something went wrong.' })
@@ -31,9 +32,9 @@ export default function Reports() {
 
     const byStatus = STATUSES.map((s) => ({ label: s.label, tone: s.tone, count: tasks.filter((t) => t.status === s.key).length }))
     const byPriority = PRIORITIES.map((p) => ({ label: p.label, tone: p.tone, count: tasks.filter((t) => t.priority === p.key).length }))
-    const byAssignee = MEMBERS.map((m) => {
+    const byAssignee = members.map((m) => {
       const items = tasks.filter((t) => (t.assignees || []).includes(m.id))
-      return { label: m.name, initials: m.initials, count: items.length, done: items.filter((t) => t.status === 'completed').length }
+      return { label: m.name, initials: initialsOf(m.name), count: items.length, done: items.filter((t) => t.status === 'completed').length }
     }).filter((m) => m.count > 0)
     const byProject = projects.map((p) => ({
       label: p.name,
@@ -42,7 +43,7 @@ export default function Reports() {
     }))
 
     return { total, done, overdue, completion, byStatus, byPriority, byAssignee, byProject }
-  }, [tasks, projects])
+  }, [tasks, projects, members])
 
   const exportCsv = () => {
     const headers = ['Title', 'Status', 'Priority', 'Assignees', 'Department', 'Company', 'Start Date', 'Due Date', 'Notes']
@@ -50,7 +51,7 @@ export default function Reports() {
       t.title,
       t.status,
       t.priority,
-      (t.assignees || []).map((id) => memberMeta(id)?.name || '').filter(Boolean).join('; '),
+      memberNames(t.assignees, members).join('; '),
       t.department || '',
       t.company || '',
       t.startDate || '',
@@ -95,7 +96,7 @@ export default function Reports() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[tone].soft}`}>

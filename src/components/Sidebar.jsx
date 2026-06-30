@@ -7,7 +7,7 @@ export default function Sidebar() {
   const { isAdmin } = useAuth()
   const items = navItems.filter((n) => !n.adminOnly || isAdmin)
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">

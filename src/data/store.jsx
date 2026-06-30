@@ -7,7 +7,7 @@ import { TASK_DEFAULTS } from './config'
 
 // Auto-select the backend: Supabase when its env vars are present, else local.
 // Both implement the same getAll/create/update/remove/replace interface.
-const backend = hasSupabaseConfig ? createSupabaseBackend(seedData) : createLocalBackend(seedData)
+const backend = hasSupabaseConfig ? createSupabaseBackend() : createLocalBackend(seedData)
 export const BACKEND_MODE = hasSupabaseConfig ? 'supabase' : 'local'
 
 const DataContext = createContext(null)

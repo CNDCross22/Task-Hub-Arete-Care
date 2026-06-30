@@ -11,7 +11,7 @@ import { supabase } from './supabaseClient'
 const orderTasks = (q) =>
   q.order('sortIndex', { ascending: true, nullsFirst: true }).order('createdAt', { ascending: false })
 
-export function createSupabaseBackend(seed) {
+export function createSupabaseBackend() {
   return {
     async getAll() {
       const [proj, task, mem] = await Promise.all([
@@ -22,23 +22,11 @@ export function createSupabaseBackend(seed) {
       if (proj.error) throw proj.error
       if (task.error) throw task.error
 
-      let projects = proj.data || []
-      let tasks = task.data || []
-      // members table may not exist yet (before supabase-members.sql is run) —
-      // don't let that break the app.
+      // No seeding — the app reflects exactly what is in the database.
+      const projects = proj.data || []
+      const tasks = task.data || []
+      // members table may not exist yet — don't let that break the app.
       const members = mem.error ? [] : mem.data || []
-
-      // First run against a fresh database — load the sample data so the app
-      // isn't empty (mirrors localBackend's seed-on-first-run behavior).
-      if (projects.length === 0 && tasks.length === 0 && seed) {
-        const seededTasks = seed.tasks.map((t, i) => ({ ...t, sortIndex: i }))
-        const r1 = await supabase.from('projects').insert(seed.projects)
-        if (r1.error) throw r1.error
-        const r2 = await supabase.from('tasks').insert(seededTasks)
-        if (r2.error) throw r2.error
-        projects = seed.projects
-        tasks = seededTasks
-      }
 
       return { projects, tasks, members }
     },

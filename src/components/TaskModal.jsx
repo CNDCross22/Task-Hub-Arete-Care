@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronUp, Trash2, X, Plus } from 'lucide-react'
 import { useData } from '@/data/store'
-import {
-  STATUSES,
-  PRIORITIES,
-  DEPARTMENTS,
-  COMPANIES,
-  RECURRENCES,
-  MEMBERS,
-  memberMeta,
-} from '@/data/config'
+import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
 import { todayStr } from '@/lib/dates'
 
 const empty = {
@@ -30,8 +22,9 @@ const empty = {
 }
 
 export default function TaskModal() {
-  const { modal, closeModal, createTask, updateTask, removeTask } = useData()
+  const { modal, closeModal, createTask, updateTask, removeTask, members } = useData()
   const [form, setForm] = useState(empty)
+  const memberById = (id) => members.find((m) => m.id === id) || null
 
   const isEdit = modal.mode === 'edit'
 
@@ -66,7 +59,7 @@ export default function TaskModal() {
     closeModal()
   }
 
-  const available = MEMBERS.filter((m) => !form.assignees.includes(m.id))
+  const available = members.filter((m) => m.active !== false && !form.assignees.includes(m.id))
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8">
@@ -116,7 +109,7 @@ export default function TaskModal() {
               <div className="rounded-lg border border-slate-300 px-2 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {form.assignees.map((id) => {
-                    const m = memberMeta(id)
+                    const m = memberById(id)
                     if (!m) return null
                     return (
                       <span

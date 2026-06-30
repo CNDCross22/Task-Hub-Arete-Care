@@ -5,7 +5,7 @@
 // should run inside a Supabase Edge Function so the key stays server-side — only
 // the call sites (Reports / Weekly Report) change to invoke the function URL.
 
-import { STATUSES, PRIORITIES, COMPANIES, DEPARTMENTS, memberMeta } from '@/data/config'
+import { STATUSES, PRIORITIES, COMPANIES, DEPARTMENTS } from '@/data/config'
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
@@ -53,9 +53,10 @@ export async function generateText(prompt, { model = MODEL, signal } = {}) {
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
 // Compact, token-light snapshot of the task data for the model.
-export function buildSnapshot(tasks) {
+export function buildSnapshot(tasks, members = []) {
   const today = todayStr()
   const count = (fn) => tasks.filter(fn).length
+  const nameOf = new Map((members || []).map((m) => [m.id, m.name]))
 
   const overdue = tasks.filter((t) => t.status !== 'completed' && t.dueDate && t.dueDate < today)
 
@@ -68,8 +69,7 @@ export function buildSnapshot(tasks) {
   const workload = {}
   for (const t of tasks) {
     for (const id of t.assignees || []) {
-      const m = memberMeta(id)
-      const name = m ? m.name : id
+      const name = nameOf.get(id) || id
       workload[name] = workload[name] || { total: 0, open: 0 }
       workload[name].total += 1
       if (t.status !== 'completed') workload[name].open += 1
@@ -98,8 +98,8 @@ export function buildSnapshot(tasks) {
   }
 }
 
-export async function generateInsights(tasks, opts = {}) {
-  const snapshot = buildSnapshot(tasks)
+export async function generateInsights(tasks, members = [], opts = {}) {
+  const snapshot = buildSnapshot(tasks, members)
   const prompt = `You are an operations analyst for a cross-company task hub spanning the companies ${COMPANIES.join(
     ', ',
   )} and the departments ${DEPARTMENTS.join(', ')}.

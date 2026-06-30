@@ -26,7 +26,7 @@ export default function Projects() {
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {summaries.map(({ project, items, done, pct, byStatus }) => (
         <div key={project.id} className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-start gap-3 border-b border-slate-100 p-5">

@@ -47,7 +47,7 @@ export default function Kanban() {
               e.preventDefault()
               commitDrop(col.key)
             }}
-            className={`flex w-80 shrink-0 flex-col rounded-xl border bg-slate-100/60 ${
+            className={`flex min-w-[15rem] flex-1 flex-col rounded-xl border bg-slate-100/60 ${
               isOver ? 'border-brand-300 ring-2 ring-brand-100' : 'border-slate-200'
             }`}
           >

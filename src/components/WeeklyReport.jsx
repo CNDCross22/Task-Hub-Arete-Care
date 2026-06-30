@@ -10,7 +10,7 @@ import Markdownish from '@/components/Markdownish'
 const TITLE = 'IT & Marketing Weekly Report'
 
 export default function WeeklyReport() {
-  const { tasks } = useData()
+  const { tasks, members } = useData()
   const [week, setWeek] = useState(0) // 0 = this week, -1 = last week
   const [state, setState] = useState({ text: '', loading: false, error: '', range: null })
   const [exporting, setExporting] = useState('')
@@ -24,7 +24,7 @@ export default function WeeklyReport() {
   const generate = async () => {
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const { text, range } = await generateWeeklyReport(tasks, { offsetWeeks: week })
+      const { text, range } = await generateWeeklyReport(tasks, { offsetWeeks: week, members })
       setState({ text, loading: false, error: '', range })
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e.message || 'Something went wrong.' }))

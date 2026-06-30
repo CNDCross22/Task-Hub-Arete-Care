@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { ListTodo, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
 import { useData } from '@/data/store'
-import { STATUSES, statusMeta, priorityMeta, TONE, resolveAssignees } from '@/data/config'
+import { STATUSES, statusMeta, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 
@@ -45,7 +45,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <span

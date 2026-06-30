@@ -3,13 +3,13 @@
 //   ## DEPARTMENT  →  ### COMPANY  →  #### Category  →  - accomplishment bullets
 
 import { generateText } from './gemini'
-import { memberMeta, DEPARTMENTS } from '@/data/config'
+import { DEPARTMENTS } from '@/data/config'
+import { memberNames } from '@/lib/members'
 import { workWeekRange } from '@/lib/dates'
 
-const names = (ids) => (ids || []).map((id) => memberMeta(id)?.name || id)
 const dayOf = (v) => (v ? String(v).slice(0, 10) : '')
 
-export function buildWeeklySnapshot(tasks, offsetWeeks = 0) {
+export function buildWeeklySnapshot(tasks, members = [], offsetWeeks = 0) {
   const { startKey, endKey } = workWeekRange(offsetWeeks)
   const inWeek = (v) => {
     const d = dayOf(v)
@@ -29,7 +29,7 @@ export function buildWeeklySnapshot(tasks, offsetWeeks = 0) {
       title: t.title,
       description: t.description || '',
       notes: t.notes || '',
-      assignees: names(t.assignees),
+      assignees: memberNames(t.assignees, members),
       priority: t.priority,
     })
   }
@@ -42,8 +42,8 @@ export function buildWeeklySnapshot(tasks, offsetWeeks = 0) {
   }
 }
 
-export async function generateWeeklyReport(tasks, { offsetWeeks = 0, ...opts } = {}) {
-  const snapshot = buildWeeklySnapshot(tasks, offsetWeeks)
+export async function generateWeeklyReport(tasks, { offsetWeeks = 0, members = [], ...opts } = {}) {
+  const snapshot = buildWeeklySnapshot(tasks, members, offsetWeeks)
 
   const prompt = `You are an operations associate compiling the team's WEEKLY REPORT covering IT and Marketing work across several companies.
 

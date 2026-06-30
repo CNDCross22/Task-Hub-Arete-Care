@@ -27,14 +27,6 @@ export const RECURRENCES = [
   { key: 'monthly', label: 'Monthly' },
 ]
 
-export const MEMBERS = [
-  { id: 'u_alex', name: 'Alex Carter', initials: 'AC' },
-  { id: 'u_priya', name: 'Priya Shah', initials: 'PS' },
-  { id: 'u_marcus', name: 'Marcus Lee', initials: 'ML' },
-  { id: 'u_dana', name: 'Dana White', initials: 'DW' },
-  { id: 'u_sam', name: 'Sam Rivera', initials: 'SR' },
-]
-
 // Defaults that mirror the Create Task form.
 export const TASK_DEFAULTS = {
   status: 'pending',
@@ -54,7 +46,3 @@ export const TONE = {
 
 export const statusMeta = (key) => STATUSES.find((s) => s.key === key) || STATUSES[0]
 export const priorityMeta = (key) => PRIORITIES.find((p) => p.key === key) || PRIORITIES[1]
-export const memberMeta = (id) => MEMBERS.find((m) => m.id === id) || null
-
-// Resolve an array of assignee ids to member objects (skips unknown ids).
-export const resolveAssignees = (ids) => (ids || []).map(memberMeta).filter(Boolean)
