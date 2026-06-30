@@ -172,11 +172,12 @@ function collapseSeries(list) {
   const result = []
   const repIndex = new Map()
   for (const t of list) {
-    if (!t.recurring) {
+    // Only collapse tasks that belong to a recurring series.
+    if (!t.seriesId) {
       result.push({ ...t, _count: 1 })
       continue
     }
-    const key = `${t.title}|${t.recurrence}|${t.company}|${t.department}`
+    const key = t.seriesId
     if (!repIndex.has(key)) {
       repIndex.set(key, result.length)
       result.push({ ...t, _count: 1 })

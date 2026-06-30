@@ -27,9 +27,11 @@ const empty = {
 }
 
 export default function TaskModal() {
-  const { modal, closeModal, createTask, updateTask, removeTask, members } = useData()
+  const { modal, closeModal, createTask, updateTask, removeTask, updateSeries, deleteSeries, members } =
+    useData()
   const [form, setForm] = useState(empty)
   const [closing, setClosing] = useState(false)
+  const [scope, setScope] = useState(null) // { kind: 'save' | 'delete', payload? } for recurring series
   const memberById = (id) => members.find((m) => m.id === id) || null
 
   const isEdit = modal.mode === 'edit'
@@ -37,6 +39,7 @@ export default function TaskModal() {
   useEffect(() => {
     if (!modal.open) return
     setClosing(false)
+    setScope(null)
     const today = todayStr()
     setForm({ ...empty, startDate: today, dueDate: today, ...(modal.task || {}) })
   }, [modal.open, modal.task])
@@ -62,13 +65,34 @@ export default function TaskModal() {
     e.preventDefault()
     if (!form.title.trim()) return
     const payload = { ...form, title: form.title.trim() }
-    if (isEdit && form.id) await updateTask(form.id, payload)
-    else await createTask(payload)
+    if (isEdit && form.id) {
+      // Editing one task of a recurring series — ask scope first.
+      if (form.seriesId) return setScope({ kind: 'save', payload })
+      await updateTask(form.id, payload)
+    } else {
+      await createTask(payload)
+    }
     requestClose()
   }
 
   const handleDelete = async () => {
-    if (form.id) await removeTask(form.id)
+    if (!form.id) return requestClose()
+    if (form.seriesId) return setScope({ kind: 'delete' })
+    await removeTask(form.id)
+    requestClose()
+  }
+
+  // Resolve the "this occurrence vs all occurrences" choice.
+  const applyScope = async (all) => {
+    if (scope.kind === 'save') {
+      if (all) await updateSeries(form.seriesId, scope.payload)
+      else await updateTask(form.id, scope.payload)
+    } else if (all) {
+      await deleteSeries(form.seriesId)
+    } else {
+      await removeTask(form.id)
+    }
+    setScope(null)
     requestClose()
   }
 
@@ -300,6 +324,44 @@ export default function TaskModal() {
           </div>
         </div>
       </form>
+
+      {scope && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-80 animate-scale-in rounded-2xl bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-slate-900">
+              {scope.kind === 'delete' ? 'Delete recurring task' : 'Save recurring task'}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              This task repeats. {scope.kind === 'delete' ? 'Delete' : 'Apply changes to'}:
+            </p>
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => applyScope(false)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                This occurrence
+              </button>
+              <button
+                type="button"
+                onClick={() => applyScope(true)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-white ${
+                  scope.kind === 'delete' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-brand-600 hover:bg-brand-700'
+                }`}
+              >
+                All occurrences
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope(null)}
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

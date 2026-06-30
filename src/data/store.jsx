@@ -38,6 +38,9 @@ const nextDate = (key, recurrence) => {
   return addDays(key, RECUR_DAYS[recurrence] || 7)
 }
 
+// Fields that stay per-occurrence and are never copied across a series edit.
+const SERIES_SKIP = ['id', 'seriesId', 'startDate', 'dueDate', 'status', 'completedAt', 'createdAt', 'sortIndex']
+
 // Pre-build the upcoming occurrences of a recurring task so they're all visible.
 // Caps at 12 occurrences and ~6 months out.
 function buildSeries(task) {
@@ -109,12 +112,15 @@ export function DataProvider({ children }) {
       recurring: false,
       recurrence: 'weekly',
       completedAt: null,
+      seriesId: null,
       ...TASK_DEFAULTS,
       ...data,
     }
     const item = {
       ...base,
       completedAt: base.status === 'completed' ? base.completedAt || nowIso() : null,
+      // A recurring task and all its occurrences share one series id.
+      seriesId: base.recurring ? base.seriesId || uid('s') : null,
     }
     await backend.create('tasks', item)
     // Recurring task: also create the upcoming occurrences so they're all visible.
@@ -134,11 +140,16 @@ export function DataProvider({ children }) {
           completedAt: completionStamp(existing?.status, existing?.completedAt, patch.status),
         }
       }
+      // Turning recurring ON (via edit) assigns a series id + pre-creates occurrences.
+      const turningOn = patch.recurring === true && existing && existing.recurring !== true
+      if (turningOn) {
+        finalPatch = { ...finalPatch, seriesId: existing.seriesId || uid('s') }
+      }
+
       await backend.update('tasks', id, finalPatch)
       setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...finalPatch } : x)))
 
-      // Turning recurring ON (via edit) pre-creates the upcoming occurrences.
-      if (patch.recurring === true && existing && existing.recurring !== true) {
+      if (turningOn) {
         const series = buildSeries({ ...existing, ...finalPatch })
         if (series.length) {
           await Promise.all(series.map((c) => backend.create('tasks', c)))
@@ -161,6 +172,28 @@ export function DataProvider({ children }) {
     await Promise.all(ids.map((id) => backend.remove('tasks', id)))
     setTasks([])
   }, [tasks])
+
+  // Apply detail edits to every occurrence in a series. Per-occurrence fields
+  // (dates, status, identity) are never overwritten across the series.
+  const updateSeries = useCallback(
+    async (seriesId, patch) => {
+      const fields = { ...patch }
+      for (const k of SERIES_SKIP) delete fields[k]
+      const targets = tasks.filter((t) => t.seriesId === seriesId)
+      await Promise.all(targets.map((t) => backend.update('tasks', t.id, fields)))
+      setTasks((ts) => ts.map((t) => (t.seriesId === seriesId ? { ...t, ...fields } : t)))
+    },
+    [tasks],
+  )
+
+  const deleteSeries = useCallback(
+    async (seriesId) => {
+      const ids = tasks.filter((t) => t.seriesId === seriesId).map((t) => t.id)
+      await Promise.all(ids.map((id) => backend.remove('tasks', id)))
+      setTasks((ts) => ts.filter((t) => t.seriesId !== seriesId))
+    },
+    [tasks],
+  )
 
   const moveTask = useCallback((id, status) => updateTask(id, { status }), [updateTask])
 
@@ -267,6 +300,8 @@ export function DataProvider({ children }) {
       updateTask,
       removeTask,
       clearTasks,
+      updateSeries,
+      deleteSeries,
       moveTask,
       reorderTask,
       createProject,
@@ -289,6 +324,8 @@ export function DataProvider({ children }) {
       updateTask,
       removeTask,
       clearTasks,
+      updateSeries,
+      deleteSeries,
       moveTask,
       reorderTask,
       createProject,

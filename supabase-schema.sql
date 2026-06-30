@@ -31,11 +31,13 @@ create table if not exists public.tasks (
   "completedAt" text,
   tags         text[] default '{}',
   "createdAt"  text,
-  "sortIndex"  double precision
+  "sortIndex"  double precision,
+  "seriesId"   text
 );
 
 create index if not exists tasks_status_idx on public.tasks (status);
 create index if not exists tasks_company_idx on public.tasks (company);
+create index if not exists tasks_series_idx on public.tasks ("seriesId");
 
 -- DEV ONLY ---------------------------------------------------------------
 -- Allow the public anon key to read/write without authentication so the app
