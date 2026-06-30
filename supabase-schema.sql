@@ -46,3 +46,13 @@ create index if not exists tasks_series_idx on public.tasks ("seriesId");
 alter table public.projects disable row level security;
 alter table public.tasks    disable row level security;
 -- ------------------------------------------------------------------------
+
+-- Brute-force throttle for the Edge Function's access-code auth. Written only by
+-- the function (service role); RLS on with NO policies so the public key can
+-- neither read it nor tamper with it.
+create table if not exists public.auth_throttle (
+  ip           text primary key,
+  fails        int not null default 0,
+  window_start timestamptz not null default now()
+);
+alter table public.auth_throttle enable row level security;

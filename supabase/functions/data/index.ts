@@ -13,11 +13,32 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS: echo the request Origin only if it's a known app origin, else fall back
+// to the production site so other origins get a mismatch and are blocked.
+const ALLOWED_ORIGINS = new Set([
+  'https://cndcross22.github.io', // GitHub Pages (production)
+  'http://localhost:5173', // Vite dev
+  'http://localhost:4173', // Vite preview
+])
+const corsHeaders = (req: Request) => {
+  const origin = req.headers.get('Origin') || ''
+  const allow = ALLOWED_ORIGINS.has(origin) ? origin : 'https://cndcross22.github.io'
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  }
 }
+
+// Brute-force throttle on FAILED access-code attempts, keyed by client IP. State
+// lives in a shared DB table (auth_throttle) so it works across ALL function
+// isolates (an in-memory counter doesn't — Supabase spreads requests around).
+// Only failed auths count, so legitimate users are never throttled.
+const RL_WINDOW_MS = 60_000
+const RL_MAX_FAILS = 10
+const clientIp = (req: Request) =>
+  (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
 
 // Only these tables may ever be addressed by the client. Without this, the
 // caller-supplied `collection` would flow straight into admin.from(collection),
@@ -29,8 +50,25 @@ const admin = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 )
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
+const throttleExpired = (windowStart: string) =>
+  Date.now() - new Date(windowStart).getTime() > RL_WINDOW_MS
+
+// True if this IP has hit the failed-attempt cap within the current window.
+async function isThrottled(ip: string): Promise<boolean> {
+  const { data } = await admin.from('auth_throttle').select('fails, window_start').eq('ip', ip).maybeSingle()
+  if (!data || throttleExpired(data.window_start)) return false
+  return data.fails >= RL_MAX_FAILS
+}
+
+// Count one failed attempt for this IP (starting a fresh window if needed).
+async function recordFail(ip: string): Promise<void> {
+  const { data } = await admin.from('auth_throttle').select('fails, window_start').eq('ip', ip).maybeSingle()
+  if (!data || throttleExpired(data.window_start)) {
+    await admin.from('auth_throttle').upsert({ ip, fails: 1, window_start: new Date().toISOString() })
+  } else {
+    await admin.from('auth_throttle').update({ fails: data.fails + 1 }).eq('ip', ip)
+  }
+}
 
 // Hide other people's access codes from non-admins.
 const stripCode = (m: Record<string, unknown>) => {
@@ -38,9 +76,17 @@ const stripCode = (m: Record<string, unknown>) => {
   return rest
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req)
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+
+  // Throttle IPs that have recently failed auth too many times.
+  const ip = clientIp(req)
+  if (await isThrottled(ip)) return json({ error: 'Too many attempts. Please wait a minute and try again.' }, 429)
 
   let payload: any
   try {
@@ -62,7 +108,10 @@ Deno.serve(async (req) => {
     .eq('active', true)
     .maybeSingle()
   if (cErr) return json({ error: cErr.message }, 500)
-  if (!caller) return json({ error: 'Invalid or inactive access code' }, 401)
+  if (!caller) {
+    await recordFail(ip) // count the bad code toward this IP's throttle
+    return json({ error: 'Invalid or inactive access code' }, 401)
+  }
 
   const isAdmin = caller.role === 'admin'
   // Managing people requires admin.
