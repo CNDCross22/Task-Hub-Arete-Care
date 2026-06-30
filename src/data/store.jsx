@@ -105,6 +105,14 @@ export function DataProvider({ children }) {
     setTasks((t) => t.filter((x) => x.id !== id))
   }, [])
 
+  // Delete every task (used by the Admin "clear tasks" tool during testing).
+  const clearTasks = useCallback(async () => {
+    const ids = tasks.map((t) => t.id)
+    if (ids.length === 0) return
+    await Promise.all(ids.map((id) => backend.remove('tasks', id)))
+    setTasks([])
+  }, [tasks])
+
   const moveTask = useCallback((id, status) => updateTask(id, { status }), [updateTask])
 
   // Drag-and-drop reorder. Removes the dragged task and re-inserts it:
@@ -218,6 +226,7 @@ export function DataProvider({ children }) {
       createTask,
       updateTask,
       removeTask,
+      clearTasks,
       moveTask,
       reorderTask,
       createProject,
@@ -240,6 +249,7 @@ export function DataProvider({ children }) {
       createTask,
       updateTask,
       removeTask,
+      clearTasks,
       moveTask,
       reorderTask,
       createProject,

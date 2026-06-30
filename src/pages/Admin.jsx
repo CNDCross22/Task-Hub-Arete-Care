@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock } from 'lucide-react'
+import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock, AlertTriangle } from 'lucide-react'
 import { useData } from '@/data/store'
 import { useAuth } from '@/auth/AuthProvider'
 import { DEPARTMENTS } from '@/data/config'
@@ -160,6 +160,46 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
       <p className="text-center text-xs text-slate-400">
         Access codes are how people sign in. Keep them private; regenerate any that leak.
       </p>
+
+      <DangerZone />
+    </div>
+  )
+}
+
+function DangerZone() {
+  const { tasks, clearTasks } = useData()
+  const [busy, setBusy] = useState(false)
+
+  const onClear = async () => {
+    if (!tasks.length) return
+    if (!window.confirm(`Delete all ${tasks.length} task(s)? This cannot be undone.`)) return
+    setBusy(true)
+    try {
+      await clearTasks()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-5">
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={20} className="mt-0.5 shrink-0 text-rose-500" />
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-rose-700">Clear all tasks</h3>
+          <p className="mt-1 text-sm text-rose-600/80">
+            Deletes every task in the database — handy during testing to wipe end-user data.
+            People and projects are kept. This cannot be undone.
+          </p>
+        </div>
+        <button
+          onClick={onClear}
+          disabled={busy || tasks.length === 0}
+          className="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+        >
+          {busy ? 'Clearing…' : `Clear ${tasks.length} task${tasks.length === 1 ? '' : 's'}`}
+        </button>
+      </div>
     </div>
   )
 }
