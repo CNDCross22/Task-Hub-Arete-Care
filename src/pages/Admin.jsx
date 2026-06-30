@@ -59,7 +59,7 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       {/* Add person */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2.5">
@@ -77,7 +77,7 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
             placeholder="Full name"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-2"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-3"
           />
           <div className="sm:col-span-3">
             <Select
@@ -96,7 +96,7 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
               ]}
             />
           </div>
-          <div className="flex items-center gap-1 sm:col-span-3">
+          <div className="flex items-center gap-1 sm:col-span-2">
             <input
               value={form.accessCode}
               onChange={(e) => set('accessCode', e.target.value)}
@@ -249,7 +249,7 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            className="w-40 rounded border border-transparent px-1.5 py-1 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-brand-400 focus:bg-white focus:outline-none"
+            className="w-full min-w-[10rem] rounded border border-transparent px-1.5 py-1 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-brand-400 focus:bg-white focus:outline-none"
           />
           {isSelf && <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>}
         </div>
@@ -272,7 +272,7 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
         )}
       </td>
       <td className="px-4 py-3">
-        <div className="w-40">
+        <div className="w-48">
           <Select
             size="sm"
             value={m.department || ''}
@@ -288,7 +288,7 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
             onChange={(e) => setCode(e.target.value)}
             onBlur={saveCode}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            className={`w-32 rounded border px-2 py-1 font-mono text-xs outline-none focus:ring-2 focus:ring-brand-100 ${
+            className={`w-full min-w-[9rem] rounded border px-2 py-1 font-mono text-xs outline-none focus:ring-2 focus:ring-brand-100 ${
               err ? 'border-rose-300 bg-rose-50' : 'border-slate-200 focus:border-brand-400'
             }`}
           />
