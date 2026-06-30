@@ -3,7 +3,7 @@ import { ChevronUp, Trash2, X, Plus, Loader2 } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
 import { shortName } from '@/lib/members'
-import { todayStr } from '@/lib/dates'
+import { todayOnBoard } from '@/lib/dates'
 import DatePicker from '@/components/DatePicker'
 import TimePicker from '@/components/TimePicker'
 import Select from '@/components/Select'
@@ -45,7 +45,7 @@ export default function TaskModal() {
     setScope(null)
     setBusyKind(null)
     setScopeBusy(null)
-    const today = todayStr()
+    const today = todayOnBoard()
     setForm({ ...empty, startDate: today, dueDate: today, ...(modal.task || {}) })
   }, [modal.open, modal.task])
 

@@ -1,13 +1,13 @@
 // Small date helpers working in local time, using YYYY-MM-DD strings.
 
-import { COMPANY_TZ, DEFAULT_TZ } from '@/data/config'
+import { BOARD_TZ } from '@/data/config'
 
+// Viewer's local YYYY-MM-DD (used only for calendar rendering internals).
 export const todayStr = () => toKey(new Date())
 
-// --- Per-company timezone awareness ---------------------------------------
-// A task's "today / overdue / due" is judged in its company's local day, so a
-// TFO India task and an Arete Care (Melbourne) task can roll over on different
-// clocks. Intl handles DST (e.g. Melbourne AEST↔AEDT) automatically.
+// --- One fixed board timezone (Melbourne) ---------------------------------
+// Every "today / overdue / due" decision is made in the team's timezone so it's
+// the same for everyone regardless of their device. Intl handles DST.
 const _tzFmt = {}
 const tzFormatter = (tz) =>
   (_tzFmt[tz] ||= new Intl.DateTimeFormat('en-CA', {
@@ -24,13 +24,12 @@ export const todayInZone = (tz) => {
   return `${get('year')}-${get('month')}-${get('day')}`
 }
 
-// Today for the company that owns a task (falls back to the default zone).
-export const todayForCompany = (company) => todayInZone(COMPANY_TZ[company] || DEFAULT_TZ)
+// Today on the board's fixed timezone — the single source of truth for "today".
+export const todayOnBoard = () => todayInZone(BOARD_TZ)
 
-// Status helpers that respect each task's company timezone.
 export const isOverdue = (task) =>
-  task.status !== 'completed' && !!task.dueDate && task.dueDate < todayForCompany(task.company)
-export const isDueToday = (task) => !!task.dueDate && task.dueDate === todayForCompany(task.company)
+  task.status !== 'completed' && !!task.dueDate && task.dueDate < todayOnBoard()
+export const isDueToday = (task) => !!task.dueDate && task.dueDate === todayOnBoard()
 
 export const toKey = (d) => {
   const y = d.getFullYear()

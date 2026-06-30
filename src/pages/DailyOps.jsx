@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CheckCircle2, Circle, AlertTriangle, CalendarClock, Inbox } from 'lucide-react'
 import { useData } from '@/data/store'
 import { priorityMeta } from '@/data/config'
-import { todayStr, addDays, prettyDate, isOverdue, isDueToday, todayForCompany } from '@/lib/dates'
+import { addDays, prettyDate, isOverdue, isDueToday, todayOnBoard } from '@/lib/dates'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 
@@ -11,12 +11,9 @@ export default function DailyOps() {
 
   const groups = useMemo(() => {
     const active = tasks.filter((t) => t.status !== 'completed')
-    // "Due this week" = after today through 7 days out, in the company's own zone.
-    const dueThisWeek = (t) => {
-      if (!t.dueDate) return false
-      const ct = todayForCompany(t.company)
-      return t.dueDate > ct && t.dueDate <= addDays(ct, 7)
-    }
+    // "Due this week" = after today through 7 days out, on the board's clock.
+    const today = todayOnBoard()
+    const dueThisWeek = (t) => t.dueDate && t.dueDate > today && t.dueDate <= addDays(today, 7)
     return [
       {
         key: 'overdue',
@@ -60,7 +57,7 @@ export default function DailyOps() {
           {totalActive} active task{totalActive === 1 ? '' : 's'} to coordinate today
         </p>
         <button
-          onClick={() => openNewTask({ dueDate: todayStr() })}
+          onClick={() => openNewTask({ dueDate: todayOnBoard() })}
           className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
         >
           + Add for Today

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Calendar as CalIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import Popover from './Popover'
-import { toKey, fromKey, MONTHS, WEEKDAYS, medDate } from '@/lib/dates'
+import { toKey, fromKey, MONTHS, WEEKDAYS, medDate, todayOnBoard } from '@/lib/dates'
 
 const triggerCls =
   'flex w-full items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-left text-sm outline-none hover:border-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100'
@@ -42,7 +42,7 @@ function CalendarPanel({ value, onSelect, onClear }) {
   const month = view.getMonth()
   const startWeekday = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const today = toKey(new Date())
+  const today = todayOnBoard()
 
   const cells = []
   for (let i = 0; i < startWeekday; i++) cells.push(null)
