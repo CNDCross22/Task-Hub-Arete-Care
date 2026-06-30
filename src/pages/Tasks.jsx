@@ -6,7 +6,7 @@ import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
 import Select from '@/components/Select'
-import { todayStr } from '@/lib/dates'
+import { isOverdue } from '@/lib/dates'
 
 export default function Tasks() {
   const { tasks, openNewTask, openEditTask, loading } = useData()
@@ -99,7 +99,7 @@ export default function Tasks() {
             {paged.map((t) => {
               const sm = statusMeta(t.status)
               const pm = priorityMeta(t.priority)
-              const overdue = t.status !== 'completed' && t.dueDate && t.dueDate < todayStr()
+              const overdue = isOverdue(t)
               return (
                 <tr key={t.id} onClick={() => openEditTask(t)} className="cursor-pointer hover:bg-slate-50">
                   <td className="px-4 py-3">

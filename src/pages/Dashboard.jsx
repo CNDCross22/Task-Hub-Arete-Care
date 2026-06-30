@@ -4,17 +4,16 @@ import { useData } from '@/data/store'
 import { STATUSES, statusMeta, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
-import { todayStr } from '@/lib/dates'
+import { isOverdue } from '@/lib/dates'
 
 export default function Dashboard() {
   const { tasks, openEditTask, loading } = useData()
 
   const stats = useMemo(() => {
-    const today = todayStr()
     const open = tasks.filter((t) => t.status !== 'completed').length
     const done = tasks.filter((t) => t.status === 'completed').length
     const inProgress = tasks.filter((t) => t.status === 'in_progress').length
-    const overdue = tasks.filter((t) => t.status !== 'completed' && t.dueDate && t.dueDate < today).length
+    const overdue = tasks.filter(isOverdue).length
     return [
       { label: 'Open Tasks', value: open, icon: ListTodo, tone: 'blue' },
       { label: 'Completed', value: done, icon: CheckCircle2, tone: 'emerald' },

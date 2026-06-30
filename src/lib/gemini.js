@@ -7,7 +7,7 @@
 
 import { STATUSES, PRIORITIES, COMPANIES, DEPARTMENTS } from '@/data/config'
 import { hasEdgeConfig, aiViaEdge } from '@/data/backend/edgeBackend'
-import { todayStr } from '@/lib/dates'
+import { isOverdue } from '@/lib/dates'
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
@@ -58,11 +58,10 @@ export async function generateText(prompt, { model = MODEL, signal } = {}) {
 
 // Compact, token-light snapshot of the task data for the model.
 export function buildSnapshot(tasks, members = []) {
-  const today = todayStr()
   const count = (fn) => tasks.filter(fn).length
   const nameOf = new Map((members || []).map((m) => [m.id, m.name]))
 
-  const overdue = tasks.filter((t) => t.status !== 'completed' && t.dueDate && t.dueDate < today)
+  const overdue = tasks.filter(isOverdue)
 
   const tally = (keys, pick) =>
     keys.reduce((acc, k) => {

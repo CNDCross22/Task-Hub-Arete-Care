@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Download, CheckCircle2, ListTodo, AlertTriangle, Activity, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, COMPANIES, TONE } from '@/data/config'
-import { todayStr } from '@/lib/dates'
+import { isOverdue } from '@/lib/dates'
 import { initialsOf, memberNames, shortName } from '@/lib/members'
 import { generateInsights, isAIConfigured } from '@/lib/gemini'
 import Markdownish from '@/components/Markdownish'
@@ -24,10 +24,9 @@ export default function Reports() {
   }
 
   const metrics = useMemo(() => {
-    const today = todayStr()
     const total = tasks.length
     const done = tasks.filter((t) => t.status === 'completed').length
-    const overdue = tasks.filter((t) => t.status !== 'completed' && t.dueDate && t.dueDate < today).length
+    const overdue = tasks.filter(isOverdue).length
     const completion = total ? Math.round((done / total) * 100) : 0
 
     const byStatus = STATUSES.map((s) => ({ label: s.label, tone: s.tone, count: tasks.filter((t) => t.status === s.key).length }))

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CheckCircle2, Circle, AlertTriangle, CalendarClock, Inbox } from 'lucide-react'
 import { useData } from '@/data/store'
 import { priorityMeta } from '@/data/config'
-import { todayStr, addDays, prettyDate } from '@/lib/dates'
+import { todayStr, addDays, prettyDate, isOverdue, isDueToday, todayForCompany } from '@/lib/dates'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 
@@ -10,30 +10,34 @@ export default function DailyOps() {
   const { tasks, updateTask, openEditTask, openNewTask, loading } = useData()
 
   const groups = useMemo(() => {
-    const today = todayStr()
-    const weekEnd = addDays(today, 7)
     const active = tasks.filter((t) => t.status !== 'completed')
+    // "Due this week" = after today through 7 days out, in the company's own zone.
+    const dueThisWeek = (t) => {
+      if (!t.dueDate) return false
+      const ct = todayForCompany(t.company)
+      return t.dueDate > ct && t.dueDate <= addDays(ct, 7)
+    }
     return [
       {
         key: 'overdue',
         title: 'Overdue',
         icon: AlertTriangle,
         iconClass: 'text-rose-500',
-        items: active.filter((t) => t.dueDate && t.dueDate < today),
+        items: active.filter(isOverdue),
       },
       {
         key: 'today',
         title: 'Due Today',
         icon: CalendarClock,
         iconClass: 'text-amber-500',
-        items: active.filter((t) => t.dueDate === today),
+        items: active.filter(isDueToday),
       },
       {
         key: 'week',
         title: 'Due This Week',
         icon: CalendarClock,
         iconClass: 'text-blue-500',
-        items: active.filter((t) => t.dueDate && t.dueDate > today && t.dueDate <= weekEnd),
+        items: active.filter(dueThisWeek),
       },
       {
         key: 'backlog',

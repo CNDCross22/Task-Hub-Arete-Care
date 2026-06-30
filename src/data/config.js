@@ -18,6 +18,17 @@ export const PRIORITIES = [
 // Cross-company operations: tasks belong to a company and a department.
 export const COMPANIES = ['Arete Care', 'TFO PH', 'TFO India', 'Mamta Face Yoga', 'Raaehi']
 
+// Each company's home IANA timezone — used to judge a task's "today / overdue /
+// due this week" in the company's local day (DST handled by the Intl API).
+export const COMPANY_TZ = {
+  'Arete Care': 'Australia/Melbourne',
+  'TFO PH': 'Asia/Manila',
+  'TFO India': 'Asia/Kolkata',
+  'Mamta Face Yoga': 'Australia/Melbourne',
+  Raaehi: 'Asia/Kolkata',
+}
+export const DEFAULT_TZ = 'Asia/Manila'
+
 export const DEPARTMENTS = ['IT', 'Marketing', 'Community Partnership']
 
 export const RECURRENCES = [

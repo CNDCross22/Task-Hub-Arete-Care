@@ -4,7 +4,7 @@ import { useData } from '@/data/store'
 import { STATUSES, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
-import { todayStr } from '@/lib/dates'
+import { isOverdue } from '@/lib/dates'
 
 export default function Kanban() {
   const { tasks, reorderTask, openNewTask, openEditTask, loading } = useData()
@@ -72,7 +72,7 @@ export default function Kanban() {
             <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-3">
               {colTasks.map((t, i) => {
                 const pm = priorityMeta(t.priority)
-                const overdue = t.status !== 'completed' && t.dueDate && t.dueDate < todayStr()
+                const overdue = isOverdue(t)
                 const nextId = colTasks[i + 1]?.id ?? null
                 const showBefore = isOver && drop.beforeId === t.id && dragId !== t.id
                 return (

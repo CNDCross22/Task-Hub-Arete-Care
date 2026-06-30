@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bell, AlertTriangle, CalendarClock, BellRing } from 'lucide-react'
 import { useData } from '@/data/store'
 import { TONE, priorityMeta } from '@/data/config'
-import { todayStr, prettyDate } from '@/lib/dates'
+import { todayStr, prettyDate, isOverdue, isDueToday } from '@/lib/dates'
 import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 
 export default function NotificationBell() {
@@ -13,8 +13,8 @@ export default function NotificationBell() {
   const today = todayStr()
 
   const { overdue, dueToday, count } = useMemo(() => {
-    const overdue = tasks.filter((t) => t.status !== 'completed' && t.dueDate && t.dueDate < today)
-    const dueToday = tasks.filter((t) => t.status !== 'completed' && t.dueDate === today)
+    const overdue = tasks.filter(isOverdue)
+    const dueToday = tasks.filter((t) => t.status !== 'completed' && isDueToday(t))
     return { overdue, dueToday, count: overdue.length + dueToday.length }
   }, [tasks, today])
 
