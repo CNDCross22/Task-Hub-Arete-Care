@@ -25,15 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build
+        # Config comes from the committed .env.production (safe: publishable key
+        # only, RLS-protected; no Gemini key in the bundle).
         run: npm run build
-        env:
-          # Added in repo Settings → Secrets and variables → Actions.
-          # NOTE: these end up in the public JS bundle on the deployed site.
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
-          VITE_GEMINI_MODEL: ${{ secrets.VITE_GEMINI_MODEL }}
-          VITE_REQUIRE_LOGIN: ${{ secrets.VITE_REQUIRE_LOGIN }}
       - name: SPA fallback (serve index.html on deep links)
         run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
