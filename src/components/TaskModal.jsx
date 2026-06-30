@@ -257,8 +257,8 @@ export default function TaskModal() {
                   options={RECURRENCES.map((r) => ({ value: r.key, label: r.label }))}
                 />
                 <p className="text-xs text-slate-500">
-                  When this task is completed, the next one is created automatically with its dates
-                  moved ahead.
+                  Saving creates the upcoming occurrences automatically, so they appear on the board
+                  and calendar.
                 </p>
               </div>
             )}

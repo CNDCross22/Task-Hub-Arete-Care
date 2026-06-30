@@ -38,16 +38,32 @@ const nextDate = (key, recurrence) => {
   return addDays(key, RECUR_DAYS[recurrence] || 7)
 }
 
-// Build the next occurrence of a recurring task (fresh, dates advanced).
-function nextOccurrence(task) {
+// Pre-build the upcoming occurrences of a recurring task so they're all visible.
+// Caps at 12 occurrences and ~6 months out.
+function buildSeries(task) {
+  const anchor = task.dueDate || task.startDate
+  if (!task.recurring || !anchor) return []
+  const horizon = addDays(anchor, 180)
   const { id, createdAt, sortIndex, ...rest } = task
-  return {
-    ...rest,
-    status: 'pending',
-    completedAt: null,
-    startDate: nextDate(task.startDate, task.recurrence),
-    dueDate: nextDate(task.dueDate, task.recurrence),
+  const out = []
+  let s = task.startDate
+  let d = task.dueDate
+  for (let i = 0; i < 12; i++) {
+    s = s ? nextDate(s, task.recurrence) : ''
+    d = d ? nextDate(d, task.recurrence) : ''
+    const probe = d || s
+    if (!probe || probe > horizon) break
+    out.push({
+      ...rest,
+      id: `t_${Math.random().toString(36).slice(2, 10)}`,
+      createdAt: new Date().toISOString(),
+      startDate: s,
+      dueDate: d,
+      completedAt: null,
+      status: 'pending',
+    })
   }
+  return out
 }
 
 export function DataProvider({ children }) {
@@ -101,30 +117,36 @@ export function DataProvider({ children }) {
       completedAt: base.status === 'completed' ? base.completedAt || nowIso() : null,
     }
     await backend.create('tasks', item)
-    setTasks((t) => [item, ...t])
+    // Recurring task: also create the upcoming occurrences so they're all visible.
+    const series = buildSeries(item)
+    await Promise.all(series.map((c) => backend.create('tasks', c)))
+    setTasks((t) => [...series, item, ...t])
     return item
   }, [])
 
   const updateTask = useCallback(
     async (id, patch) => {
+      const existing = tasks.find((t) => t.id === id)
       let finalPatch = patch
-      let spawn = null
       if ('status' in patch) {
-        const existing = tasks.find((t) => t.id === id)
         finalPatch = {
           ...patch,
           completedAt: completionStamp(existing?.status, existing?.completedAt, patch.status),
         }
-        // Completing a recurring task spawns its next occurrence.
-        if (patch.status === 'completed' && existing?.status !== 'completed' && existing?.recurring) {
-          spawn = existing
-        }
       }
       await backend.update('tasks', id, finalPatch)
       setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...finalPatch } : x)))
-      if (spawn) await createTask(nextOccurrence(spawn))
+
+      // Turning recurring ON (via edit) pre-creates the upcoming occurrences.
+      if (patch.recurring === true && existing && existing.recurring !== true) {
+        const series = buildSeries({ ...existing, ...finalPatch })
+        if (series.length) {
+          await Promise.all(series.map((c) => backend.create('tasks', c)))
+          setTasks((t) => [...series, ...t])
+        }
+      }
     },
-    [tasks, createTask],
+    [tasks],
   )
 
   const removeTask = useCallback(async (id) => {
@@ -175,13 +197,8 @@ export function DataProvider({ children }) {
 
       setTasks(arr)
       await backend.replace('tasks', arr)
-
-      // Dragging a recurring task to Completed spawns its next occurrence.
-      if (newStatus === 'completed' && moving.status !== 'completed' && moving.recurring) {
-        await createTask(nextOccurrence(moving))
-      }
     },
-    [tasks, createTask],
+    [tasks],
   )
 
   const createProject = useCallback(async (data) => {
