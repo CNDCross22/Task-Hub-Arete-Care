@@ -47,7 +47,7 @@ export default function Dashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
             <span
               className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[tone].soft}`}
             >

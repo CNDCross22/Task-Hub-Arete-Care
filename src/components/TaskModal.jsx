@@ -24,12 +24,14 @@ const empty = {
 export default function TaskModal() {
   const { modal, closeModal, createTask, updateTask, removeTask, members } = useData()
   const [form, setForm] = useState(empty)
+  const [closing, setClosing] = useState(false)
   const memberById = (id) => members.find((m) => m.id === id) || null
 
   const isEdit = modal.mode === 'edit'
 
   useEffect(() => {
     if (!modal.open) return
+    setClosing(false)
     const today = todayStr()
     setForm({ ...empty, startDate: today, dueDate: today, ...(modal.task || {}) })
   }, [modal.open, modal.task])
@@ -37,6 +39,12 @@ export default function TaskModal() {
   if (!modal.open) return null
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Play the exit animation, then actually close.
+  const requestClose = () => {
+    setClosing(true)
+    window.setTimeout(closeModal, 160)
+  }
 
   const addAssignee = (id) => {
     if (!id) return
@@ -51,12 +59,12 @@ export default function TaskModal() {
     const payload = { ...form, title: form.title.trim() }
     if (isEdit && form.id) await updateTask(form.id, payload)
     else await createTask(payload)
-    closeModal()
+    requestClose()
   }
 
   const handleDelete = async () => {
     if (form.id) await removeTask(form.id)
-    closeModal()
+    requestClose()
   }
 
   // Admins manage the system and aren't assignable — only active members.
@@ -65,17 +73,23 @@ export default function TaskModal() {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in sm:p-8">
+    <div
+      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8 ${
+        closing ? 'animate-fade-out' : 'animate-fade-in'
+      }`}
+    >
       <form
         onSubmit={handleSave}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 animate-scale-in"
+        className={`my-2 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 ${
+          closing ? 'animate-scale-out' : 'animate-scale-in'
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pb-2 pt-5">
           <h2 className="text-xl font-bold text-slate-900">{isEdit ? 'Edit Task' : 'Create Task'}</h2>
           <button
             type="button"
-            onClick={closeModal}
+            onClick={requestClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             title="Close"
           >
@@ -254,7 +268,7 @@ export default function TaskModal() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={closeModal}
+              onClick={requestClose}
               className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
             >
               Cancel

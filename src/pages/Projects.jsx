@@ -28,7 +28,7 @@ export default function Projects() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {summaries.map(({ project, items, done, pct, byStatus }) => (
-        <div key={project.id} className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div key={project.id} className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
           <div className="flex items-start gap-3 border-b border-slate-100 p-5">
             <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[project.color]?.soft || TONE.slate.soft}`}>
               <FolderKanban size={20} />

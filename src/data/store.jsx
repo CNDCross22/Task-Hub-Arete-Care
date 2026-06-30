@@ -197,15 +197,6 @@ export function DataProvider({ children }) {
     setMembers((m) => m.filter((x) => x.id !== id))
   }, [])
 
-  const resetData = useCallback(() => {
-    try {
-      localStorage.removeItem('arete-task-hub:v3')
-    } catch {
-      /* ignore */
-    }
-    window.location.reload()
-  }, [])
-
   // Modal controls
   const openNewTask = useCallback(
     (prefill = {}) => setModal({ open: true, mode: 'create', task: prefill }),
@@ -235,7 +226,6 @@ export function DataProvider({ children }) {
       createMember,
       updateMember,
       removeMember,
-      resetData,
       modal,
       openNewTask,
       openEditTask,
@@ -258,7 +248,6 @@ export function DataProvider({ children }) {
       createMember,
       updateMember,
       removeMember,
-      resetData,
       modal,
       openNewTask,
       openEditTask,

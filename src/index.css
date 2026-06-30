@@ -16,6 +16,37 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
 
+/* Smooth, consistent micro-transitions on every interactive element so nothing
+   snaps (hover colors, focus rings, shadows, transforms all ease). */
+@layer base {
+  a,
+  button,
+  select,
+  summary,
+  input,
+  textarea,
+  [role='button'] {
+    @apply transition duration-150 ease-out;
+  }
+
+  /* Subtle tactile press feedback on buttons */
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Thin, subtle scrollbars */
 ::-webkit-scrollbar {
   width: 10px;

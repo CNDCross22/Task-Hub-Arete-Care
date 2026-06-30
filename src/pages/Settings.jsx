@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Plus, Trash2, FolderKanban, Tag, Flag, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, FolderKanban, Tag, Flag } from 'lucide-react'
 import { useData, BACKEND_MODE } from '@/data/store'
 import { STATUSES, PRIORITIES, TONE } from '@/data/config'
 
 const COLORS = ['blue', 'emerald', 'amber', 'rose', 'slate']
 
 export default function Settings() {
-  const { projects, tasks, createProject, removeProject, resetData, loading } = useData()
+  const { projects, tasks, createProject, removeProject, loading } = useData()
   const [name, setName] = useState('')
   const [color, setColor] = useState('blue')
 
@@ -94,27 +94,6 @@ export default function Settings() {
             ))}
           </div>
         </Section>
-      </div>
-
-      {/* Danger zone */}
-      <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-5">
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={20} className="mt-0.5 text-rose-500" />
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-rose-700">Reset all data</h3>
-            <p className="mt-1 text-sm text-rose-600/80">
-              Clears local data and restores the sample tasks. This cannot be undone.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              if (window.confirm('Reset all local data back to the sample set?')) resetData()
-            }}
-            className="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700"
-          >
-            Reset Data
-          </button>
-        </div>
       </div>
 
       <p className="text-center text-xs text-slate-400">
