@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock } from 'lucide-react'
 import { useData } from '@/data/store'
 import { useAuth } from '@/auth/AuthProvider'
@@ -20,13 +21,10 @@ export default function Admin() {
       />
     )
   }
+  // Non-admins (e.g. after a different user signs in on a leftover /admin URL)
+  // are sent to the dashboard rather than shown a dead-end "Admins only" wall.
   if (!isAdmin) {
-    return (
-      <Locked
-        title="Admins only"
-        body="You don't have access to this page. Ask an administrator if you need it."
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   return <AdminBody members={members} me={me} loading={loading} createMember={createMember} updateMember={updateMember} removeMember={removeMember} />
