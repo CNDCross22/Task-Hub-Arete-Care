@@ -15,9 +15,15 @@ export const addDays = (key, n) => {
   return toKey(d)
 }
 
+// Add months, clamping to the last valid day so end-of-month dates don't
+// overflow (Jan 31 + 1 month → Feb 28/29, not Mar 3).
 export const addMonths = (key, n) => {
   const d = fromKey(key)
+  const day = d.getDate()
+  d.setDate(1)
   d.setMonth(d.getMonth() + n)
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  d.setDate(Math.min(day, lastDay))
   return toKey(d)
 }
 

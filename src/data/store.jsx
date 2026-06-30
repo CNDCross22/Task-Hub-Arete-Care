@@ -41,17 +41,22 @@ const nextDate = (key, recurrence) => {
 // Fields that stay per-occurrence and are never copied across a series edit.
 const SERIES_SKIP = ['id', 'seriesId', 'startDate', 'dueDate', 'status', 'completedAt', 'createdAt', 'sortIndex']
 
+// How many upcoming occurrences to pre-build per frequency — enough runway
+// for each cadence without flooding (daily ≈ 6 weeks, weekly ≈ 3 months,
+// bi-weekly/monthly ≈ 6 months). A 1-year horizon is a hard backstop.
+const SERIES_COUNT = { daily: 30, weekly: 12, biweekly: 12, monthly: 6 }
+
 // Pre-build the upcoming occurrences of a recurring task so they're all visible.
-// Caps at 12 occurrences and ~6 months out.
 function buildSeries(task) {
   const anchor = task.dueDate || task.startDate
   if (!task.recurring || !anchor) return []
-  const horizon = addDays(anchor, 180)
+  const horizon = addDays(anchor, 370)
+  const max = SERIES_COUNT[task.recurrence] || 12
   const { id, createdAt, sortIndex, ...rest } = task
   const out = []
   let s = task.startDate
   let d = task.dueDate
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < max; i++) {
     s = s ? nextDate(s, task.recurrence) : ''
     d = d ? nextDate(d, task.recurrence) : ''
     const probe = d || s
