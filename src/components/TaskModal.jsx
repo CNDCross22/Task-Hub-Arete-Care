@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronUp, Trash2, X, Plus } from 'lucide-react'
+import { ChevronUp, Trash2, X, Plus, Loader2 } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
 import { shortName } from '@/lib/members'
@@ -32,6 +32,9 @@ export default function TaskModal() {
   const [form, setForm] = useState(empty)
   const [closing, setClosing] = useState(false)
   const [scope, setScope] = useState(null) // { kind: 'save' | 'delete', payload? } for recurring series
+  const [busyKind, setBusyKind] = useState(null) // 'save' | 'delete' while a request is in flight
+  const [scopeBusy, setScopeBusy] = useState(null) // 'this' | 'all' — which series button is running
+  const busy = busyKind !== null
   const memberById = (id) => members.find((m) => m.id === id) || null
 
   const isEdit = modal.mode === 'edit'
@@ -40,6 +43,8 @@ export default function TaskModal() {
     if (!modal.open) return
     setClosing(false)
     setScope(null)
+    setBusyKind(null)
+    setScopeBusy(null)
     const today = todayStr()
     setForm({ ...empty, startDate: today, dueDate: today, ...(modal.task || {}) })
   }, [modal.open, modal.task])
@@ -61,41 +66,49 @@ export default function TaskModal() {
   const removeAssignee = (id) =>
     setForm((f) => ({ ...f, assignees: f.assignees.filter((a) => a !== id) }))
 
-  const handleSave = async (e) => {
+  // Run an async action with a button spinner; close on success, stay open on
+  // failure (the store already surfaces the error as a toast).
+  const runAction = async (kind, action) => {
+    setBusyKind(kind)
+    try {
+      await action()
+      setScope(null)
+      requestClose()
+    } catch {
+      setBusyKind(null)
+      setScopeBusy(null)
+    }
+  }
+
+  const handleSave = (e) => {
     e.preventDefault()
-    if (!form.title.trim()) return
+    if (!form.title.trim() || busy) return
     // _count is a display-only field added by the Tasks-list collapse — never persist it.
     const { _count, ...clean } = form
     const payload = { ...clean, title: clean.title.trim() }
-    if (isEdit && form.id) {
-      // Editing one task of a recurring series — ask scope first.
-      if (form.seriesId) return setScope({ kind: 'save', payload })
-      await updateTask(form.id, payload)
-    } else {
-      await createTask(payload)
-    }
-    requestClose()
+    // Editing one task of a recurring series — ask scope first.
+    if (isEdit && form.id && form.seriesId) return setScope({ kind: 'save', payload })
+    runAction('save', () => (isEdit && form.id ? updateTask(form.id, payload) : createTask(payload)))
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    if (busy) return
     if (!form.id) return requestClose()
     if (form.seriesId) return setScope({ kind: 'delete' })
-    await removeTask(form.id)
-    requestClose()
+    runAction('delete', () => removeTask(form.id))
   }
 
   // Resolve the "this occurrence vs all occurrences" choice.
-  const applyScope = async (all) => {
+  const applyScope = (all) => {
+    if (busy) return
+    setScopeBusy(all ? 'all' : 'this')
     if (scope.kind === 'save') {
-      if (all) await updateSeries(form.seriesId, scope.payload)
-      else await updateTask(form.id, scope.payload)
-    } else if (all) {
-      await deleteSeries(form.seriesId)
+      runAction('save', () =>
+        all ? updateSeries(form.seriesId, scope.payload) : updateTask(form.id, scope.payload),
+      )
     } else {
-      await removeTask(form.id)
+      runAction('delete', () => (all ? deleteSeries(form.seriesId) : removeTask(form.id)))
     }
-    setScope(null)
-    requestClose()
   }
 
   // Admins manage the system and aren't assignable — only active members.
@@ -300,10 +313,11 @@ export default function TaskModal() {
             <button
               type="button"
               onClick={handleDelete}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
             >
-              <Trash2 size={16} />
-              Delete
+              {busyKind === 'delete' ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              {busyKind === 'delete' ? 'Deleting…' : 'Delete'}
             </button>
           ) : (
             <span />
@@ -312,16 +326,22 @@ export default function TaskModal() {
             <button
               type="button"
               onClick={requestClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              disabled={busy}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-70"
             >
-              {!isEdit && <Plus size={16} />}
-              {isEdit ? 'Save Changes' : 'Create Task'}
+              {busyKind === 'save' ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                !isEdit && <Plus size={16} />
+              )}
+              {busyKind === 'save' ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Task'}
             </button>
           </div>
         </div>
@@ -340,23 +360,28 @@ export default function TaskModal() {
               <button
                 type="button"
                 onClick={() => applyScope(false)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={busy}
+                className="flex w-full items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
+                {scopeBusy === 'this' && <Loader2 size={14} className="animate-spin" />}
                 This occurrence
               </button>
               <button
                 type="button"
                 onClick={() => applyScope(true)}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-white ${
+                disabled={busy}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white disabled:opacity-70 ${
                   scope.kind === 'delete' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-brand-600 hover:bg-brand-700'
                 }`}
               >
+                {scopeBusy === 'all' && <Loader2 size={14} className="animate-spin" />}
                 All occurrences
               </button>
               <button
                 type="button"
                 onClick={() => setScope(null)}
-                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+                disabled={busy}
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
                 Cancel
               </button>

@@ -35,6 +35,10 @@ export default {
           from: { opacity: '1', transform: 'scale(1)' },
           to: { opacity: '0', transform: 'scale(0.96)' },
         },
+        'progress-slide': {
+          '0%': { transform: 'translateX(-120%)' },
+          '100%': { transform: 'translateX(420%)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
@@ -42,6 +46,7 @@ export default {
         'fade-in-up': 'fade-in-up 0.25s ease-out',
         'scale-in': 'scale-in 0.18s ease-out',
         'scale-out': 'scale-out 0.16s ease-in forwards',
+        'progress-slide': 'progress-slide 1.1s ease-in-out infinite',
       },
     },
   },

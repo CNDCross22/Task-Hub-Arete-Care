@@ -13,7 +13,7 @@ export default function Settings() {
   const addProject = (e) => {
     e.preventDefault()
     if (!name.trim()) return
-    createProject({ name: name.trim(), color })
+    createProject({ name: name.trim(), color }).catch(() => {}) // error shown via toast
     setName('')
     setColor('blue')
   }
@@ -33,7 +33,7 @@ export default function Settings() {
                 <span className="flex-1 text-sm font-medium text-slate-700">{p.name}</span>
                 <span className="text-xs text-slate-400">{count} task{count === 1 ? '' : 's'}</span>
                 <button
-                  onClick={() => removeProject(p.id)}
+                  onClick={() => removeProject(p.id).catch(() => {})}
                   className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                   title="Delete project"
                 >

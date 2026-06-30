@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useData } from '@/data/store'
 import Layout from '@/components/Layout'
+import LoadingScreen from '@/components/LoadingScreen'
 import Dashboard from '@/pages/Dashboard'
 import DailyOps from '@/pages/DailyOps'
 import Tasks from '@/pages/Tasks'
@@ -11,6 +13,8 @@ import Admin from '@/pages/Admin'
 import Settings from '@/pages/Settings'
 
 export default function App() {
+  const { loading } = useData()
+  if (loading) return <LoadingScreen />
   return (
     <Layout>
       <Routes>

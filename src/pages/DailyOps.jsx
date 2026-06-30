@@ -81,7 +81,7 @@ export default function DailyOps() {
                   return (
                     <li key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                       <button
-                        onClick={() => updateTask(t.id, { status: 'completed' })}
+                        onClick={() => updateTask(t.id, { status: 'completed' }).catch(() => {})}
                         title="Mark complete"
                         className="text-slate-300 hover:text-emerald-500"
                       >

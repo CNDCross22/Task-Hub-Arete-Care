@@ -177,6 +177,8 @@ function DangerZone() {
     setBusy(true)
     try {
       await clearTasks()
+    } catch {
+      /* error surfaced via toast */
     } finally {
       setBusy(false)
     }

@@ -6,6 +6,7 @@ import { hasSupabaseConfig } from './backend/supabaseClient'
 import { seedData } from './seed'
 import { TASK_DEFAULTS } from './config'
 import { addDays, addMonths } from '@/lib/dates'
+import { useToast } from '@/components/Toast'
 
 // Backend priority:
 //   edge     — secure Edge Function proxy (RLS on; service key server-side)
@@ -79,9 +80,30 @@ export function DataProvider({ children }) {
   const [tasks, setTasks] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [busyCount, setBusyCount] = useState(0)
+  const toast = useToast()
 
   // Shared task editor modal state (used by Topbar, Tasks, Kanban, etc.)
   const [modal, setModal] = useState({ open: false, mode: 'create', task: null })
+
+  // Run a backend mutation with a global busy flag + success/error toast.
+  // Rethrows so callers that care (e.g. the task modal) can react to failure.
+  const runMutation = useCallback(
+    async (fn, { success, error } = {}) => {
+      setBusyCount((n) => n + 1)
+      try {
+        const result = await fn()
+        if (success) toast.success(success)
+        return result
+      } catch (e) {
+        toast.error(error || e?.message || 'Something went wrong')
+        throw e
+      } finally {
+        setBusyCount((n) => n - 1)
+      }
+    },
+    [toast],
+  )
 
   useEffect(() => {
     let active = true
@@ -108,75 +130,106 @@ export function DataProvider({ children }) {
     }
   }, [])
 
-  const createTask = useCallback(async (data) => {
-    const base = {
-      id: uid('t'),
-      createdAt: nowIso(),
-      assignees: [],
-      tags: [],
-      recurring: false,
-      recurrence: 'weekly',
-      completedAt: null,
-      seriesId: null,
-      ...TASK_DEFAULTS,
-      ...data,
-    }
-    const item = {
-      ...base,
-      completedAt: base.status === 'completed' ? base.completedAt || nowIso() : null,
-      // A recurring task and all its occurrences share one series id.
-      seriesId: base.recurring ? base.seriesId || uid('s') : null,
-    }
-    await backend.create('tasks', item)
-    // Recurring task: also create the upcoming occurrences so they're all visible.
-    const series = buildSeries(item)
-    await Promise.all(series.map((c) => backend.create('tasks', c)))
-    setTasks((t) => [...series, item, ...t])
-    return item
-  }, [])
-
-  const updateTask = useCallback(
-    async (id, patch) => {
-      const existing = tasks.find((t) => t.id === id)
-      let finalPatch = patch
-      if ('status' in patch) {
-        finalPatch = {
-          ...patch,
-          completedAt: completionStamp(existing?.status, existing?.completedAt, patch.status),
-        }
-      }
-      // Turning recurring ON (via edit) assigns a series id + pre-creates occurrences.
-      const turningOn = patch.recurring === true && existing && existing.recurring !== true
-      if (turningOn) {
-        finalPatch = { ...finalPatch, seriesId: existing.seriesId || uid('s') }
-      }
-
-      await backend.update('tasks', id, finalPatch)
-      setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...finalPatch } : x)))
-
-      if (turningOn) {
-        const series = buildSeries({ ...existing, ...finalPatch })
-        if (series.length) {
+  const createTask = useCallback(
+    (data) =>
+      runMutation(
+        async () => {
+          const base = {
+            id: uid('t'),
+            createdAt: nowIso(),
+            assignees: [],
+            tags: [],
+            recurring: false,
+            recurrence: 'weekly',
+            completedAt: null,
+            seriesId: null,
+            ...TASK_DEFAULTS,
+            ...data,
+          }
+          const item = {
+            ...base,
+            completedAt: base.status === 'completed' ? base.completedAt || nowIso() : null,
+            // A recurring task and all its occurrences share one series id.
+            seriesId: base.recurring ? base.seriesId || uid('s') : null,
+          }
+          await backend.create('tasks', item)
+          // Recurring task: also create the upcoming occurrences so they're all visible.
+          const series = buildSeries(item)
           await Promise.all(series.map((c) => backend.create('tasks', c)))
-          setTasks((t) => [...series, ...t])
-        }
-      }
-    },
-    [tasks],
+          setTasks((t) => [...series, item, ...t])
+          return item
+        },
+        {
+          success: data?.recurring ? 'Recurring task created' : 'Task created',
+          error: 'Couldn’t create the task',
+        },
+      ),
+    [runMutation],
   )
 
-  const removeTask = useCallback(async (id) => {
-    await backend.remove('tasks', id)
-    setTasks((t) => t.filter((x) => x.id !== id))
-  }, [])
+  const updateTask = useCallback(
+    (id, patch) => {
+      const existing = tasks.find((t) => t.id === id)
+      const justCompleted = patch.status === 'completed' && existing?.status !== 'completed'
+      return runMutation(
+        async () => {
+          let finalPatch = patch
+          if ('status' in patch) {
+            finalPatch = {
+              ...patch,
+              completedAt: completionStamp(existing?.status, existing?.completedAt, patch.status),
+            }
+          }
+          // Turning recurring ON (via edit) assigns a series id + pre-creates occurrences.
+          const turningOn = patch.recurring === true && existing && existing.recurring !== true
+          if (turningOn) {
+            finalPatch = { ...finalPatch, seriesId: existing.seriesId || uid('s') }
+          }
+
+          await backend.update('tasks', id, finalPatch)
+          setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...finalPatch } : x)))
+
+          if (turningOn) {
+            const series = buildSeries({ ...existing, ...finalPatch })
+            if (series.length) {
+              await Promise.all(series.map((c) => backend.create('tasks', c)))
+              setTasks((t) => [...series, ...t])
+            }
+          }
+        },
+        {
+          success: justCompleted ? 'Task completed' : 'Task updated',
+          error: 'Couldn’t update the task',
+        },
+      )
+    },
+    [runMutation, tasks],
+  )
+
+  const removeTask = useCallback(
+    (id) =>
+      runMutation(
+        async () => {
+          await backend.remove('tasks', id)
+          setTasks((t) => t.filter((x) => x.id !== id))
+        },
+        { success: 'Task deleted', error: 'Couldn’t delete the task' },
+      ),
+    [runMutation],
+  )
 
   // Delete every task (used by the Admin "clear tasks" tool during testing).
-  const clearTasks = useCallback(async () => {
+  const clearTasks = useCallback(() => {
     const ids = tasks.map((t) => t.id)
-    if (ids.length === 0) return
-    await Promise.all(ids.map((id) => backend.remove('tasks', id)))
-    setTasks([])
-  }, [tasks])
+    if (ids.length === 0) return Promise.resolve()
+    return runMutation(
+      async () => {
+        await Promise.all(ids.map((id) => backend.remove('tasks', id)))
+        setTasks([])
+      },
+      { success: `Cleared ${ids.length} task${ids.length === 1 ? '' : 's'}`, error: 'Couldn’t clear tasks' },
+    )
+  }, [runMutation, tasks])
 
   // Apply an "all occurrences" edit to a series.
   //   - Detail change only → patch every occurrence, keep each one's own date.
@@ -184,49 +237,57 @@ export function DataProvider({ children }) {
   //     occurrences, and rebuild them with the new spacing (so weekly→daily
   //     actually re-spaces the dates instead of just relabeling them).
   const updateSeries = useCallback(
-    async (seriesId, patch) => {
-      const targets = tasks.filter((t) => t.seriesId === seriesId)
-      const anchor = tasks.find((t) => t.id === patch.id) || targets[0]
-      if (!anchor) return
-      const freqChanged = !!patch.recurrence && patch.recurrence !== anchor.recurrence
+    (seriesId, patch) =>
+      runMutation(
+        async () => {
+          const targets = tasks.filter((t) => t.seriesId === seriesId)
+          const anchor = tasks.find((t) => t.id === patch.id) || targets[0]
+          if (!anchor) return
+          const freqChanged = !!patch.recurrence && patch.recurrence !== anchor.recurrence
 
-      if (!freqChanged) {
-        const fields = { ...patch }
-        for (const k of SERIES_SKIP) delete fields[k]
-        await Promise.all(targets.map((t) => backend.update('tasks', t.id, fields)))
-        setTasks((ts) => ts.map((t) => (t.seriesId === seriesId ? { ...t, ...fields } : t)))
-        return
-      }
+          if (!freqChanged) {
+            const fields = { ...patch }
+            for (const k of SERIES_SKIP) delete fields[k]
+            await Promise.all(targets.map((t) => backend.update('tasks', t.id, fields)))
+            setTasks((ts) => ts.map((t) => (t.seriesId === seriesId ? { ...t, ...fields } : t)))
+            return
+          }
 
-      // Frequency changed: update the anchor in place (new freq + edits + its
-      // own dates), delete the other not-yet-done occurrences, then regenerate.
-      const updatedAnchor = { ...anchor, ...patch }
-      const anchorPatch = { ...patch }
-      delete anchorPatch.id
-      await backend.update('tasks', anchor.id, anchorPatch)
+          // Frequency changed: update the anchor in place (new freq + edits + its
+          // own dates), delete the other not-yet-done occurrences, then regenerate.
+          const updatedAnchor = { ...anchor, ...patch }
+          const anchorPatch = { ...patch }
+          delete anchorPatch.id
+          await backend.update('tasks', anchor.id, anchorPatch)
 
-      const drop = targets.filter((t) => t.id !== anchor.id && t.status !== 'completed')
-      await Promise.all(drop.map((t) => backend.remove('tasks', t.id)))
+          const drop = targets.filter((t) => t.id !== anchor.id && t.status !== 'completed')
+          await Promise.all(drop.map((t) => backend.remove('tasks', t.id)))
 
-      const regen = buildSeries(updatedAnchor)
-      await Promise.all(regen.map((c) => backend.create('tasks', c)))
+          const regen = buildSeries(updatedAnchor)
+          await Promise.all(regen.map((c) => backend.create('tasks', c)))
 
-      const dropIds = new Set(drop.map((t) => t.id))
-      setTasks((ts) => [
-        ...regen,
-        ...ts.filter((t) => !dropIds.has(t.id)).map((t) => (t.id === anchor.id ? updatedAnchor : t)),
-      ])
-    },
-    [tasks],
+          const dropIds = new Set(drop.map((t) => t.id))
+          setTasks((ts) => [
+            ...regen,
+            ...ts.filter((t) => !dropIds.has(t.id)).map((t) => (t.id === anchor.id ? updatedAnchor : t)),
+          ])
+        },
+        { success: 'All occurrences updated', error: 'Couldn’t update the series' },
+      ),
+    [runMutation, tasks],
   )
 
   const deleteSeries = useCallback(
-    async (seriesId) => {
-      const ids = tasks.filter((t) => t.seriesId === seriesId).map((t) => t.id)
-      await Promise.all(ids.map((id) => backend.remove('tasks', id)))
-      setTasks((ts) => ts.filter((t) => t.seriesId !== seriesId))
-    },
-    [tasks],
+    (seriesId) =>
+      runMutation(
+        async () => {
+          const ids = tasks.filter((t) => t.seriesId === seriesId).map((t) => t.id)
+          await Promise.all(ids.map((id) => backend.remove('tasks', id)))
+          setTasks((ts) => ts.filter((t) => t.seriesId !== seriesId))
+        },
+        { success: 'Recurring series deleted', error: 'Couldn’t delete the series' },
+      ),
+    [runMutation, tasks],
   )
 
   const moveTask = useCallback((id, status) => updateTask(id, { status }), [updateTask])
@@ -262,56 +323,106 @@ export function DataProvider({ children }) {
       }
       arr = [...arr.slice(0, insertAt), updated, ...arr.slice(insertAt)]
 
+      // Optimistic move; revert + warn if the save doesn't land. (No success
+      // toast — drag/drop is frequent and the move itself is the feedback.)
+      const prev = tasks
       setTasks(arr)
-      await backend.replace('tasks', arr)
+      try {
+        await backend.replace('tasks', arr)
+      } catch {
+        setTasks(prev)
+        toast.error('Couldn’t move the task')
+      }
     },
-    [tasks],
+    [tasks, toast],
   )
 
-  const createProject = useCallback(async (data) => {
-    const item = { id: uid('p'), color: 'blue', description: '', ...data }
-    await backend.create('projects', item)
-    setProjects((p) => [...p, item])
-    return item
-  }, [])
+  const createProject = useCallback(
+    (data) =>
+      runMutation(
+        async () => {
+          const item = { id: uid('p'), color: 'blue', description: '', ...data }
+          await backend.create('projects', item)
+          setProjects((p) => [...p, item])
+          return item
+        },
+        { success: 'Project created', error: 'Couldn’t create the project' },
+      ),
+    [runMutation],
+  )
 
-  const updateProject = useCallback(async (id, patch) => {
-    await backend.update('projects', id, patch)
-    setProjects((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))
-  }, [])
+  const updateProject = useCallback(
+    (id, patch) =>
+      runMutation(
+        async () => {
+          await backend.update('projects', id, patch)
+          setProjects((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+        },
+        { success: 'Project updated', error: 'Couldn’t update the project' },
+      ),
+    [runMutation],
+  )
 
-  const removeProject = useCallback(async (id) => {
-    await backend.remove('projects', id)
-    setProjects((p) => p.filter((x) => x.id !== id))
-    // Detach tasks from the deleted project (keep the tasks themselves).
-    setTasks((ts) => ts.map((t) => (t.projectId === id ? { ...t, projectId: '' } : t)))
-    const affected = tasks.filter((t) => t.projectId === id)
-    await Promise.all(affected.map((t) => backend.update('tasks', t.id, { projectId: '' })))
-  }, [tasks])
+  const removeProject = useCallback(
+    (id) =>
+      runMutation(
+        async () => {
+          await backend.remove('projects', id)
+          setProjects((p) => p.filter((x) => x.id !== id))
+          // Detach tasks from the deleted project (keep the tasks themselves).
+          setTasks((ts) => ts.map((t) => (t.projectId === id ? { ...t, projectId: '' } : t)))
+          const affected = tasks.filter((t) => t.projectId === id)
+          await Promise.all(affected.map((t) => backend.update('tasks', t.id, { projectId: '' })))
+        },
+        { success: 'Project deleted', error: 'Couldn’t delete the project' },
+      ),
+    [runMutation, tasks],
+  )
 
-  const createMember = useCallback(async (data) => {
-    const item = {
-      id: uid('m'),
-      role: 'member',
-      active: true,
-      department: 'IT',
-      createdAt: nowIso(),
-      ...data,
-    }
-    await backend.create('members', item)
-    setMembers((m) => [...m, item])
-    return item
-  }, [])
+  const createMember = useCallback(
+    (data) =>
+      runMutation(
+        async () => {
+          const item = {
+            id: uid('m'),
+            role: 'member',
+            active: true,
+            department: 'IT',
+            createdAt: nowIso(),
+            ...data,
+          }
+          await backend.create('members', item)
+          setMembers((m) => [...m, item])
+          return item
+        },
+        { success: 'Member added', error: 'Couldn’t add the member' },
+      ),
+    [runMutation],
+  )
 
-  const updateMember = useCallback(async (id, patch) => {
-    await backend.update('members', id, patch)
-    setMembers((m) => m.map((x) => (x.id === id ? { ...x, ...patch } : x)))
-  }, [])
+  const updateMember = useCallback(
+    (id, patch) =>
+      runMutation(
+        async () => {
+          await backend.update('members', id, patch)
+          setMembers((m) => m.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+        },
+        { success: 'Member updated', error: 'Couldn’t update the member' },
+      ),
+    [runMutation],
+  )
 
-  const removeMember = useCallback(async (id) => {
-    await backend.remove('members', id)
-    setMembers((m) => m.filter((x) => x.id !== id))
-  }, [])
+  const removeMember = useCallback(
+    (id) =>
+      runMutation(
+        async () => {
+          await backend.remove('members', id)
+          setMembers((m) => m.filter((x) => x.id !== id))
+        },
+        { success: 'Member removed', error: 'Couldn’t remove the member' },
+      ),
+    [runMutation],
+  )
 
   // Modal controls
   const openNewTask = useCallback(
@@ -330,6 +441,7 @@ export function DataProvider({ children }) {
       tasks,
       members,
       loading,
+      busy: busyCount > 0,
       createTask,
       updateTask,
       removeTask,
@@ -354,6 +466,7 @@ export function DataProvider({ children }) {
       tasks,
       members,
       loading,
+      busyCount,
       createTask,
       updateTask,
       removeTask,
