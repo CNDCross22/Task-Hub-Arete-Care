@@ -64,7 +64,9 @@ export default function TaskModal() {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!form.title.trim()) return
-    const payload = { ...form, title: form.title.trim() }
+    // _count is a display-only field added by the Tasks-list collapse — never persist it.
+    const { _count, ...clean } = form
+    const payload = { ...clean, title: clean.title.trim() }
     if (isEdit && form.id) {
       // Editing one task of a recurring series — ask scope first.
       if (form.seriesId) return setScope({ kind: 'save', payload })

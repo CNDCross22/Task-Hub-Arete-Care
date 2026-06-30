@@ -173,15 +173,44 @@ export function DataProvider({ children }) {
     setTasks([])
   }, [tasks])
 
-  // Apply detail edits to every occurrence in a series. Per-occurrence fields
-  // (dates, status, identity) are never overwritten across the series.
+  // Apply an "all occurrences" edit to a series.
+  //   - Detail change only → patch every occurrence, keep each one's own date.
+  //   - Frequency change → keep the edited task as the anchor, drop the future
+  //     occurrences, and rebuild them with the new spacing (so weekly→daily
+  //     actually re-spaces the dates instead of just relabeling them).
   const updateSeries = useCallback(
     async (seriesId, patch) => {
-      const fields = { ...patch }
-      for (const k of SERIES_SKIP) delete fields[k]
       const targets = tasks.filter((t) => t.seriesId === seriesId)
-      await Promise.all(targets.map((t) => backend.update('tasks', t.id, fields)))
-      setTasks((ts) => ts.map((t) => (t.seriesId === seriesId ? { ...t, ...fields } : t)))
+      const anchor = tasks.find((t) => t.id === patch.id) || targets[0]
+      if (!anchor) return
+      const freqChanged = !!patch.recurrence && patch.recurrence !== anchor.recurrence
+
+      if (!freqChanged) {
+        const fields = { ...patch }
+        for (const k of SERIES_SKIP) delete fields[k]
+        await Promise.all(targets.map((t) => backend.update('tasks', t.id, fields)))
+        setTasks((ts) => ts.map((t) => (t.seriesId === seriesId ? { ...t, ...fields } : t)))
+        return
+      }
+
+      // Frequency changed: update the anchor in place (new freq + edits + its
+      // own dates), delete the other not-yet-done occurrences, then regenerate.
+      const updatedAnchor = { ...anchor, ...patch }
+      const anchorPatch = { ...patch }
+      delete anchorPatch.id
+      await backend.update('tasks', anchor.id, anchorPatch)
+
+      const drop = targets.filter((t) => t.id !== anchor.id && t.status !== 'completed')
+      await Promise.all(drop.map((t) => backend.remove('tasks', t.id)))
+
+      const regen = buildSeries(updatedAnchor)
+      await Promise.all(regen.map((c) => backend.create('tasks', c)))
+
+      const dropIds = new Set(drop.map((t) => t.id))
+      setTasks((ts) => [
+        ...regen,
+        ...ts.filter((t) => !dropIds.has(t.id)).map((t) => (t.id === anchor.id ? updatedAnchor : t)),
+      ])
     },
     [tasks],
   )
