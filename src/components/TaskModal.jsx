@@ -59,7 +59,10 @@ export default function TaskModal() {
     closeModal()
   }
 
-  const available = members.filter((m) => m.active !== false && !form.assignees.includes(m.id))
+  // Admins manage the system and aren't assignable — only active members.
+  const available = members.filter(
+    (m) => m.active !== false && m.role !== 'admin' && !form.assignees.includes(m.id),
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8">
