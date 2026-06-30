@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, hasSupabaseConfig } from '@/data/backend/supabaseClient'
+import { hasEdgeConfig, loginWithCode } from '@/data/backend/edgeBackend'
 
 const AuthContext = createContext(null)
 const SESSION_KEY = 'arete-session'
@@ -23,46 +24,57 @@ export function AuthProvider({ children }) {
   // deletion / role change since last login). Runs quietly in the background.
   useEffect(() => {
     const stored = loadSession()
-    if (!stored || !supabase) return
+    if (!stored) return
     let active = true
-    supabase
-      .from('members')
-      .select('*')
-      .eq('id', stored.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active) return
-        if (data && data.active) {
-          setMember(data)
-          localStorage.setItem(SESSION_KEY, JSON.stringify(data))
-        } else {
-          localStorage.removeItem(SESSION_KEY)
-          setMember(null)
-        }
-      })
+
+    // Re-validate the stored session against the source of truth.
+    const revalidate = hasEdgeConfig
+      ? loginWithCode(stored.accessCode).catch(() => null)
+      : supabase
+        ? supabase.from('members').select('*').eq('id', stored.id).maybeSingle().then(({ data }) => data)
+        : Promise.resolve(stored)
+
+    Promise.resolve(revalidate).then((data) => {
+      if (!active) return
+      if (data && data.active !== false) {
+        setMember(data)
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data))
+      } else {
+        localStorage.removeItem(SESSION_KEY)
+        setMember(null)
+      }
+    })
     return () => {
       active = false
     }
   }, [])
 
   const signInWithCode = async (code) => {
-    if (!supabase) throw new Error('Sign-in requires the Supabase connection.')
     const trimmed = (code || '').trim()
     if (!trimmed) throw new Error('Enter your access code.')
 
-    const { data, error } = await supabase
-      .from('members')
-      .select('*')
-      .eq('accessCode', trimmed)
-      .eq('active', true)
-      .maybeSingle()
+    let data
+    if (hasEdgeConfig) {
+      data = await loginWithCode(trimmed)
+      if (!data) throw new Error('Invalid or inactive access code.')
+    } else {
+      if (!supabase) throw new Error('Sign-in requires the Supabase connection.')
+      const res = await supabase
+        .from('members')
+        .select('*')
+        .eq('accessCode', trimmed)
+        .eq('active', true)
+        .maybeSingle()
+      if (res.error) throw new Error('Could not verify the code. Is the members table set up?')
+      if (!res.data) throw new Error('Invalid or inactive access code.')
+      data = res.data
+    }
 
-    if (error) throw new Error('Could not verify the code. Is the members table set up?')
-    if (!data) throw new Error('Invalid or inactive access code.')
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(data))
-    setMember(data)
-    return data
+    // Keep the code in the session so edge requests can re-send it.
+    const session = { ...data, accessCode: trimmed }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    setMember(session)
+    return session
   }
 
   const signOut = () => {

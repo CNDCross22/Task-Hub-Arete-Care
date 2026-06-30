@@ -118,9 +118,11 @@ export default function Settings() {
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        {BACKEND_MODE === 'supabase'
-          ? 'Connected to Supabase — data syncs to the cloud.'
-          : 'Data is stored locally in your browser. Add Supabase keys to .env.local to sync.'}
+        {BACKEND_MODE === 'edge'
+          ? 'Secured via Supabase Edge Function (database locked down with RLS).'
+          : BACKEND_MODE === 'supabase'
+            ? 'Connected to Supabase — data syncs to the cloud.'
+            : 'Data is stored locally in your browser. Add Supabase keys to .env.local to sync.'}
       </p>
     </div>
   )

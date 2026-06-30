@@ -1,14 +1,21 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { createLocalBackend } from './backend/localBackend'
 import { createSupabaseBackend } from './backend/supabaseBackend'
+import { createEdgeBackend, hasEdgeConfig } from './backend/edgeBackend'
 import { hasSupabaseConfig } from './backend/supabaseClient'
 import { seedData } from './seed'
 import { TASK_DEFAULTS } from './config'
 
-// Auto-select the backend: Supabase when its env vars are present, else local.
-// Both implement the same getAll/create/update/remove/replace interface.
-const backend = hasSupabaseConfig ? createSupabaseBackend() : createLocalBackend(seedData)
-export const BACKEND_MODE = hasSupabaseConfig ? 'supabase' : 'local'
+// Backend priority:
+//   edge     — secure Edge Function proxy (RLS on; service key server-side)
+//   supabase — direct table access via publishable key (RLS off; dev only)
+//   local    — browser localStorage (no backend configured)
+const backend = hasEdgeConfig
+  ? createEdgeBackend()
+  : hasSupabaseConfig
+    ? createSupabaseBackend()
+    : createLocalBackend(seedData)
+export const BACKEND_MODE = hasEdgeConfig ? 'edge' : hasSupabaseConfig ? 'supabase' : 'local'
 
 const DataContext = createContext(null)
 
