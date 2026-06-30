@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock, AlertTriangle } from 'lucide-react'
+import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock, AlertTriangle, X, KeyRound } from 'lucide-react'
 import { useData } from '@/data/store'
 import { useAuth } from '@/auth/AuthProvider'
 import { DEPARTMENTS } from '@/data/config'
 import Select from '@/components/Select'
 
+// Long, crypto-random codes. 15 chars from a 32-symbol alphabet ≈ 32^15
+// possibilities, so guessing is infeasible even without the rate limit. (256 is
+// a multiple of 32, so `% length` is bias-free.)
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const genCode = () =>
-  'ARETE-' + Array.from({ length: 5 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('')
+const genCode = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(15))
+  const body = Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('')
+  return 'ARETE-' + body.replace(/(.{5})(.{5})(.{5})/, '$1-$2-$3')
+}
 
 export default function Admin() {
   const { members, createMember, updateMember, removeMember, loading } = useData()
@@ -43,8 +49,8 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
     setError('')
     if (!form.name.trim()) return setError('Enter a name.')
     if (!form.accessCode.trim()) return setError('Set an access code.')
-    if (members.some((m) => m.accessCode === form.accessCode.trim()))
-      return setError('That access code is already in use.')
+    // Codes are stored hashed, so the client can't compare them; a duplicate is
+    // rejected server-side by the unique index (surfaced as an error toast).
     setBusy(true)
     try {
       await createMember({ ...form, name: form.name.trim(), accessCode: form.accessCode.trim() })
@@ -68,7 +74,9 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
           </span>
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Add Person</h3>
-            <p className="text-xs text-slate-500">They sign in with the access code you set.</p>
+            <p className="text-xs text-slate-500">
+              They sign in with the access code you set. Copy it now — it's stored hashed and can't be shown again.
+            </p>
           </div>
         </div>
 
@@ -141,7 +149,6 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
               <MemberRow
                 key={m.id}
                 m={m}
-                all={members}
                 isSelf={m.id === me?.id}
                 onUpdate={updateMember}
                 onRemove={removeMember}
@@ -159,7 +166,8 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        Access codes are how people sign in. Keep them private; regenerate any that leak.
+        Access codes are stored hashed, so they can't be shown after creation. Copy a code when you set it; if
+        one is forgotten or leaks, just set a new one.
       </p>
 
       <DangerZone />
@@ -207,37 +215,18 @@ function DangerZone() {
   )
 }
 
-function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
+function MemberRow({ m, isSelf, onUpdate, onRemove }) {
   const [name, setName] = useState(m.name)
-  const [code, setCode] = useState(m.accessCode)
-  const [err, setErr] = useState('')
-  const [copied, setCopied] = useState(false)
 
-  // Re-sync drafts if the underlying record changes.
+  // Re-sync the name draft if the underlying record changes.
   useEffect(() => {
     setName(m.name)
-    setCode(m.accessCode)
-  }, [m.name, m.accessCode])
+  }, [m.name])
 
   const saveName = () => {
     const v = name.trim()
     if (!v) return setName(m.name)
     if (v !== m.name) onUpdate(m.id, { name: v })
-  }
-
-  const saveCode = () => {
-    const v = code.trim()
-    if (!v) return setErr('Code required')
-    if (v === m.accessCode) return setErr('')
-    if (all.some((x) => x.id !== m.id && x.accessCode === v)) return setErr('Code already in use')
-    setErr('')
-    onUpdate(m.id, { accessCode: v })
-  }
-
-  const copy = () => {
-    navigator.clipboard?.writeText(m.accessCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1200)
   }
 
   return (
@@ -282,36 +271,7 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-1">
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onBlur={saveCode}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            className={`w-full min-w-[9rem] rounded border px-2 py-1 font-mono text-xs outline-none focus:ring-2 focus:ring-brand-100 ${
-              err ? 'border-rose-300 bg-rose-50' : 'border-slate-200 focus:border-brand-400'
-            }`}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const taken = new Set(all.filter((x) => x.id !== m.id).map((x) => x.accessCode))
-              let next = genCode()
-              while (taken.has(next)) next = genCode()
-              setCode(next)
-              setErr('')
-              onUpdate(m.id, { accessCode: next })
-            }}
-            title="Generate new code"
-            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          >
-            <RefreshCw size={14} />
-          </button>
-          <button onClick={copy} title="Copy" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-          </button>
-        </div>
-        {err && <p className="mt-1 text-[11px] text-rose-600">{err}</p>}
+        <CodeCell m={m} onUpdate={onUpdate} />
       </td>
       <td className="px-4 py-3">
         <button
@@ -339,6 +299,87 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
         )}
       </td>
     </tr>
+  )
+}
+
+// The stored code is a one-way hash, so it can't be displayed. Admins set a new
+// code (typed or generated), which is revealed once for copying, then hidden.
+function CodeCell({ m, onUpdate }) {
+  const [mode, setMode] = useState('idle') // 'idle' | 'edit' | 'shown'
+  const [draft, setDraft] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const start = () => {
+    setDraft(genCode())
+    setMode('edit')
+  }
+  const save = async () => {
+    const v = draft.trim()
+    if (!v) return
+    try {
+      await onUpdate(m.id, { accessCode: v })
+      setMode('shown') // reveal once so it can be copied
+    } catch {
+      /* error toast surfaced by the store */
+    }
+  }
+  const copy = () => {
+    navigator.clipboard?.writeText(draft)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1200)
+  }
+
+  if (mode === 'edit') {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && save()}
+          className="w-full min-w-[12rem] rounded border border-slate-200 px-2 py-1 font-mono text-xs outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+        />
+        <button type="button" onClick={() => setDraft(genCode())} title="Generate" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <RefreshCw size={14} />
+        </button>
+        <button type="button" onClick={save} className="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700">
+          Save
+        </button>
+        <button type="button" onClick={() => setMode('idle')} title="Cancel" className="rounded p-1 text-slate-400 hover:bg-slate-100">
+          <X size={14} />
+        </button>
+      </div>
+    )
+  }
+
+  if (mode === 'shown') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <code className="rounded bg-slate-100 px-1.5 py-1 font-mono text-xs text-slate-700">{draft}</code>
+        <button type="button" onClick={copy} title="Copy" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+        </button>
+        <span className="text-[10px] font-medium text-amber-600">copy now — hidden after</span>
+        <button type="button" onClick={() => { setDraft(''); setMode('idle') }} className="rounded px-1.5 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100">
+          Done
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs text-slate-400" title="Codes are stored hashed and can't be shown">
+        ••••••••
+      </span>
+      <button
+        type="button"
+        onClick={start}
+        className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <KeyRound size={12} /> Set code
+      </button>
+    </div>
   )
 }
 

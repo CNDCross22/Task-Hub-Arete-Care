@@ -70,9 +70,30 @@ async function recordFail(ip: string): Promise<void> {
   }
 }
 
-// Hide other people's access codes from non-admins.
-const stripCode = (m: Record<string, unknown>) => {
-  const { accessCode: _omit, ...rest } = m
+// Access codes are stored only as a keyed hash. HMAC-SHA256(code, pepper) → hex,
+// the same algorithm pgcrypto used for the backfill, so a typed code hashes to
+// the stored value at login. The pepper is a server-only secret, so a DB leak
+// reveals nothing usable.
+const PEPPER = Deno.env.get('ACCESS_CODE_PEPPER') || ''
+const te = new TextEncoder()
+async function hashCode(code: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', te.encode(PEPPER), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sig = await crypto.subtle.sign('HMAC', key, te.encode(code))
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+// If a members payload carries a plain accessCode, store only its hash.
+async function withHashedCode<T extends Record<string, any>>(obj: T): Promise<T> {
+  if (obj && typeof obj === 'object' && obj.accessCode) {
+    const { accessCode: _c, ...rest } = obj
+    return { ...rest, accessCodeHash: await hashCode(String(obj.accessCode)) } as T
+  }
+  return obj
+}
+
+// Never return the code or its hash to any client.
+const stripSecret = (m: Record<string, unknown>) => {
+  const { accessCode: _c, accessCodeHash: _h, ...rest } = m
   return rest
 }
 
@@ -97,16 +118,24 @@ Deno.serve(async (req: Request) => {
 
   const { code, action, collection, id, item, patch, items } = payload || {}
 
-  // --- Authenticate the caller by access code ---
+  // --- Authenticate the caller by hashed access code ---
   const accessCode = String(code || '').trim()
   if (!accessCode) return json({ error: 'Missing access code' }, 401)
 
-  const { data: caller, error: cErr } = await admin
-    .from('members')
-    .select('*')
-    .eq('accessCode', accessCode)
-    .eq('active', true)
-    .maybeSingle()
+  const codeHash = await hashCode(accessCode)
+  let caller: any = null
+  let cErr: any = null
+  {
+    const r = await admin.from('members').select('*').eq('accessCodeHash', codeHash).eq('active', true).maybeSingle()
+    caller = r.data
+    cErr = r.error
+  }
+  // Transitional fallback: a row not yet hashed still matches by plaintext.
+  if (!cErr && !caller) {
+    const r = await admin.from('members').select('*').eq('accessCode', accessCode).eq('active', true).maybeSingle()
+    caller = r.data
+    cErr = r.error
+  }
   if (cErr) return json({ error: cErr.message }, 500)
   if (!caller) {
     await recordFail(ip) // count the bad code toward this IP's throttle
@@ -123,7 +152,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (action) {
       case 'login':
-        return json({ member: caller })
+        return json({ member: stripSecret(caller) })
 
       case 'getAll': {
         const [proj, task, mem] = await Promise.all([
@@ -137,7 +166,7 @@ Deno.serve(async (req: Request) => {
         ])
         if (proj.error) throw proj.error
         if (task.error) throw task.error
-        const members = (mem.error ? [] : mem.data || []).map((m) => (isAdmin ? m : stripCode(m)))
+        const members = (mem.error ? [] : mem.data || []).map(stripSecret)
         return json({ projects: proj.data || [], tasks: task.data || [], members })
       }
 
@@ -145,7 +174,8 @@ Deno.serve(async (req: Request) => {
         if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
         if (!item || typeof item !== 'object') return json({ error: 'Invalid item' }, 400)
-        const { error } = await admin.from(collection).insert(item)
+        const row = collection === 'members' ? await withHashedCode(item) : item
+        const { error } = await admin.from(collection).insert(row)
         if (error) throw error
         return json({ ok: true })
       }
@@ -154,7 +184,8 @@ Deno.serve(async (req: Request) => {
         if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
         if (!patch || typeof patch !== 'object') return json({ error: 'Invalid patch' }, 400)
-        const { error } = await admin.from(collection).update(patch).eq('id', id)
+        const p = collection === 'members' ? await withHashedCode(patch) : patch
+        const { error } = await admin.from(collection).update(p).eq('id', id)
         if (error) throw error
         return json({ ok: true })
       }
@@ -171,7 +202,8 @@ Deno.serve(async (req: Request) => {
         if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)
         if (!Array.isArray(items)) return json({ error: 'items must be an array' }, 400)
-        const rows = collection === 'tasks' ? items.map((it: any, i: number) => ({ ...it, sortIndex: i })) : items
+        let rows = collection === 'tasks' ? items.map((it: any, i: number) => ({ ...it, sortIndex: i })) : items
+        if (collection === 'members') rows = await Promise.all(rows.map(withHashedCode))
         const { error } = await admin.from(collection).upsert(rows)
         if (error) throw error
         return json({ ok: true })

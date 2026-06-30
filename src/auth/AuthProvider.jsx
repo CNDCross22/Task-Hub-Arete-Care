@@ -58,6 +58,9 @@ export function AuthProvider({ children }) {
       data = await loginWithCode(trimmed)
       if (!data) throw new Error('Invalid or inactive access code.')
     } else {
+      // Direct-Supabase (dev only). Access codes are hashed in production via the
+      // Edge Function (the hash pepper is server-side), so this plaintext lookup
+      // only works against a local/unhashed members table — use edge mode for real.
       if (!supabase) throw new Error('Sign-in requires the Supabase connection.')
       const res = await supabase
         .from('members')
