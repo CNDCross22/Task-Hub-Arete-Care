@@ -5,6 +5,7 @@ import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta 
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
+import Select from '@/components/Select'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
@@ -149,18 +150,10 @@ export default function Tasks() {
 }
 
 function FilterSelect({ value, onChange, all, options }) {
+  const opts = [{ value: 'all', label: all }, ...options.map((o) => ({ value: o.key, label: o.label }))]
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-    >
-      <option value="all">{all}</option>
-      {options.map((o) => (
-        <option key={o.key} value={o.key}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className="w-40">
+      <Select value={value} onChange={onChange} options={opts} />
+    </div>
   )
 }

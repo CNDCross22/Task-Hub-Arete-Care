@@ -9,7 +9,8 @@ import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 //   <Popover width={264} renderTrigger={({ open }) => <button onClick={open}/>}>
 //     {({ close }) => <Panel onSelect={() => close()} />}
 //   </Popover>
-export default function Popover({ renderTrigger, children, width = 280, align = 'left' }) {
+// width: a number (fixed px) or 'trigger' to match the trigger element's width.
+export default function Popover({ renderTrigger, children, width = 'trigger', align = 'left' }) {
   const ref = useRef(null)
   const [open, setOpen] = useState(false)
   const [style, setStyle] = useState(null)
@@ -18,16 +19,14 @@ export default function Popover({ renderTrigger, children, width = 280, align = 
   const place = () => {
     const r = ref.current?.getBoundingClientRect()
     if (!r) return
-    const left = Math.max(
-      8,
-      Math.min(align === 'right' ? r.right - width : r.left, window.innerWidth - width - 8),
-    )
+    const w = typeof width === 'number' ? width : Math.max(r.width, 140)
+    const left = Math.max(8, Math.min(align === 'right' ? r.right - w : r.left, window.innerWidth - w - 8))
     const spaceBelow = window.innerHeight - r.bottom
     const openUp = spaceBelow < 300 && r.top > spaceBelow
     setStyle(
       openUp
-        ? { position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width, maxHeight: r.top - 16 }
-        : { position: 'fixed', top: r.bottom + 6, left, width, maxHeight: spaceBelow - 16 },
+        ? { position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width: w, maxHeight: r.top - 16 }
+        : { position: 'fixed', top: r.bottom + 6, left, width: w, maxHeight: spaceBelow - 16 },
     )
   }
 

@@ -4,6 +4,7 @@ import { ShieldCheck, UserPlus, Trash2, RefreshCw, Copy, Check, Lock, AlertTrian
 import { useData } from '@/data/store'
 import { useAuth } from '@/auth/AuthProvider'
 import { DEPARTMENTS } from '@/data/config'
+import Select from '@/components/Select'
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const genCode = () =>
@@ -78,23 +79,23 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
             placeholder="Full name"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-2"
           />
-          <select
-            value={form.department}
-            onChange={(e) => set('department', e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-3"
-          >
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-          <select
-            value={form.role}
-            onChange={(e) => set('role', e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:col-span-2"
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
+          <div className="sm:col-span-3">
+            <Select
+              value={form.department}
+              onChange={(v) => set('department', v)}
+              options={DEPARTMENTS.map((d) => ({ value: d, label: d }))}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Select
+              value={form.role}
+              onChange={(v) => set('role', v)}
+              options={[
+                { value: 'member', label: 'Member' },
+                { value: 'admin', label: 'Admin' },
+              ]}
+            />
+          </div>
           <div className="flex items-center gap-1 sm:col-span-3">
             <input
               value={form.accessCode}
@@ -252,26 +253,31 @@ function MemberRow({ m, all, isSelf, onUpdate, onRemove }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <select
-          value={m.role}
-          onChange={(e) => onUpdate(m.id, { role: e.target.value })}
-          disabled={isSelf}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs capitalize outline-none focus:border-brand-400 disabled:opacity-60"
-        >
-          <option value="member">member</option>
-          <option value="admin">admin</option>
-        </select>
+        {isSelf ? (
+          <span className="px-2 text-xs capitalize text-slate-500">{m.role}</span>
+        ) : (
+          <div className="w-28">
+            <Select
+              size="sm"
+              value={m.role}
+              onChange={(v) => onUpdate(m.id, { role: v })}
+              options={[
+                { value: 'member', label: 'member' },
+                { value: 'admin', label: 'admin' },
+              ]}
+            />
+          </div>
+        )}
       </td>
       <td className="px-4 py-3">
-        <select
-          value={m.department || ''}
-          onChange={(e) => onUpdate(m.id, { department: e.target.value })}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-brand-400"
-        >
-          {DEPARTMENTS.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
+        <div className="w-40">
+          <Select
+            size="sm"
+            value={m.department || ''}
+            onChange={(v) => onUpdate(m.id, { department: v })}
+            options={DEPARTMENTS.map((d) => ({ value: d, label: d }))}
+          />
+        </div>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1">

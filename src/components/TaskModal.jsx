@@ -5,6 +5,8 @@ import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/dat
 import { todayStr } from '@/lib/dates'
 import DatePicker from '@/components/DatePicker'
 import TimePicker from '@/components/TimePicker'
+import Select from '@/components/Select'
+import Popover from '@/components/Popover'
 
 const empty = {
   title: '',
@@ -146,63 +148,71 @@ export default function TaskModal() {
                       </span>
                     )
                   })}
-                  <select
-                    value=""
-                    onChange={(e) => addAssignee(e.target.value)}
-                    className="min-w-[7rem] flex-1 bg-transparent py-1 text-sm text-slate-500 outline-none"
+                  <Popover
+                    renderTrigger={({ open }) => (
+                      <button
+                        type="button"
+                        onClick={open}
+                        className="rounded-md px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                      >
+                        + {form.assignees.length ? 'Add more' : 'Add assignees'}
+                      </button>
+                    )}
                   >
-                    <option value="">
-                      {form.assignees.length ? 'Add more…' : 'Add assignees...'}
-                    </option>
-                    {available.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
+                    {() => (
+                      <div className="py-1">
+                        {available.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-slate-400">No more members</p>
+                        ) : (
+                          available.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => addAssignee(m.id)}
+                              className="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              {m.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </Popover>
                 </div>
               </div>
             </Field>
 
             <Field label="Department" required>
-              <Select value={form.department} onChange={(v) => set('department', v)}>
-                {DEPARTMENTS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={form.department}
+                onChange={(v) => set('department', v)}
+                options={DEPARTMENTS.map((d) => ({ value: d, label: d }))}
+              />
             </Field>
           </div>
 
           {/* Company + Priority + Status */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
             <Field label="Company" required>
-              <Select value={form.company} onChange={(v) => set('company', v)}>
-                {COMPANIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={form.company}
+                onChange={(v) => set('company', v)}
+                options={COMPANIES.map((c) => ({ value: c, label: c }))}
+              />
             </Field>
             <Field label="Priority">
-              <Select value={form.priority} onChange={(v) => set('priority', v)}>
-                {PRIORITIES.map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={form.priority}
+                onChange={(v) => set('priority', v)}
+                options={PRIORITIES.map((p) => ({ value: p.key, label: p.label }))}
+              />
             </Field>
             <Field label="Status">
-              <Select value={form.status} onChange={(v) => set('status', v)}>
-                {STATUSES.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={form.status}
+                onChange={(v) => set('status', v)}
+                options={STATUSES.map((s) => ({ value: s.key, label: s.label }))}
+              />
             </Field>
           </div>
 
@@ -241,13 +251,11 @@ export default function TaskModal() {
             </div>
             {form.recurring && (
               <div className="mt-3">
-                <Select value={form.recurrence} onChange={(v) => set('recurrence', v)}>
-                  {RECURRENCES.map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {r.label}
-                    </option>
-                  ))}
-                </Select>
+                <Select
+                  value={form.recurrence}
+                  onChange={(v) => set('recurrence', v)}
+                  options={RECURRENCES.map((r) => ({ value: r.key, label: r.label }))}
+                />
               </div>
             )}
           </div>
@@ -300,14 +308,6 @@ function Field({ label, required, children }) {
       </span>
       {children}
     </label>
-  )
-}
-
-function Select({ value, onChange, children }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${input} bg-white`}>
-      {children}
-    </select>
   )
 }
 

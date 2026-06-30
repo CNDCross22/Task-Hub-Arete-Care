@@ -9,7 +9,7 @@ const triggerCls =
 export default function DatePicker({ value, onChange, placeholder = 'Select date' }) {
   return (
     <Popover
-      width={264}
+      width={288}
       renderTrigger={({ open }) => (
         <button type="button" onClick={open} className={triggerCls}>
           <CalIcon size={15} className="shrink-0 text-slate-400" />
@@ -72,13 +72,13 @@ function CalendarPanel({ value, onSelect, onClear }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-7 text-center text-[10px] font-semibold uppercase text-slate-400">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-slate-400">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">{w[0]}</div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((d, i) => {
           if (!d) return <div key={i} />
           const key = toKey(d)
@@ -89,11 +89,11 @@ function CalendarPanel({ value, onSelect, onClear }) {
               key={i}
               type="button"
               onClick={() => onSelect(key)}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm transition-colors ${
+              className={`flex aspect-square items-center justify-center rounded-lg text-sm transition-colors ${
                 selected
-                  ? 'bg-brand-600 font-semibold text-white'
+                  ? 'bg-brand-600 font-semibold text-white shadow-sm'
                   : isToday
-                    ? 'font-semibold text-brand-700 ring-1 ring-inset ring-brand-200'
+                    ? 'font-semibold text-brand-700 ring-1 ring-inset ring-brand-300'
                     : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
