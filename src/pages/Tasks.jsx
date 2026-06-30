@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Calendar as CalIcon } from 'lucide-react'
+import { Plus, Search, Calendar as CalIcon, Repeat } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta } from '@/data/config'
 import Badge from '@/components/Badge'
@@ -37,10 +37,14 @@ export default function Tasks() {
     setPage(1)
   }, [q, status, priority, department, company, pageSize])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  // Collapse each recurring series into a single row (the next active occurrence)
+  // with a count, so pre-generated occurrences don't flood the list.
+  const collapsed = useMemo(() => collapseSeries(filtered), [filtered])
+
+  const pageCount = Math.max(1, Math.ceil(collapsed.length / pageSize))
   const paged = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize],
+    () => collapsed.slice((page - 1) * pageSize, page * pageSize),
+    [collapsed, page, pageSize],
   )
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
@@ -65,7 +69,9 @@ export default function Tasks() {
         <FilterSelect value={company} onChange={setCompany} all="All companies" options={COMPANIES.map((c) => ({ key: c, label: c }))} />
 
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-slate-400">{filtered.length} of {tasks.length}</span>
+          <span className="text-sm text-slate-400">
+            {collapsed.length} row{collapsed.length === 1 ? '' : 's'}
+          </span>
           <button
             onClick={() => openNewTask()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
@@ -98,7 +104,18 @@ export default function Tasks() {
               return (
                 <tr key={t.id} onClick={() => openEditTask(t)} className="cursor-pointer hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{t.title}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-800">{t.title}</span>
+                      {t.recurring && (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700"
+                          title={`Recurring · ${t._count} occurrence${t._count === 1 ? '' : 's'}`}
+                        >
+                          <Repeat size={11} />
+                          {t._count > 1 ? `×${t._count}` : ''}
+                        </span>
+                      )}
+                    </div>
                     {t.tags?.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {t.tags.map((tag) => (
@@ -139,7 +156,7 @@ export default function Tasks() {
         <Pagination
           page={page}
           pageCount={pageCount}
-          total={filtered.length}
+          total={collapsed.length}
           pageSize={pageSize}
           onPage={setPage}
           onPageSize={setPageSize}
@@ -147,6 +164,33 @@ export default function Tasks() {
       </div>
     </div>
   )
+}
+
+// Collapse recurring occurrences into one row per series, keeping a count.
+// The representative is the earliest still-active occurrence (else the earliest).
+function collapseSeries(list) {
+  const result = []
+  const repIndex = new Map()
+  for (const t of list) {
+    if (!t.recurring) {
+      result.push({ ...t, _count: 1 })
+      continue
+    }
+    const key = `${t.title}|${t.recurrence}|${t.company}|${t.department}`
+    if (!repIndex.has(key)) {
+      repIndex.set(key, result.length)
+      result.push({ ...t, _count: 1 })
+    } else {
+      const idx = repIndex.get(key)
+      const rep = result[idx]
+      const count = rep._count + 1
+      const better =
+        t.status !== 'completed' &&
+        (rep.status === 'completed' || (t.dueDate || '9999') < (rep.dueDate || '9999'))
+      result[idx] = better ? { ...t, _count: count } : { ...rep, _count: count }
+    }
+  }
+  return result
 }
 
 function FilterSelect({ value, onChange, all, options }) {
