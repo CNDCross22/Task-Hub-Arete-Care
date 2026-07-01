@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, GripVertical } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate } from '@/lib/dates'
@@ -29,8 +29,6 @@ const startOfWeek = (d) => {
   x.setDate(x.getDate() - x.getDay())
   return x
 }
-const byTime = (a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99')
-
 // Drag-and-drop: chips carry their task id; a day cell/column is a drop target
 // that reschedules the dropped task onto its date.
 const DRAG_MIME = 'text/task-id'
@@ -55,10 +53,28 @@ const dropProps = (key, setDragOver, onReschedule) => ({
     if (id) onReschedule?.(id, key)
   },
 })
+// A chip that is BOTH draggable and a drop target (drop onto it = reorder before
+// it). stopPropagation so the day cell's own drop (reschedule) doesn't also fire.
+const chipProps = (t, setDragOver, onChipDrop) => ({
+  ...dragProps(t, setDragOver),
+  onDragOver: (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(t.dueDate)
+  },
+  onDrop: (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const id = e.dataTransfer.getData(DRAG_MIME)
+    setDragOver(null)
+    if (id) onChipDrop?.(id, t)
+  },
+})
 
 // Floating panel listing every task on a day (opened from "+N more"). No
 // blocking backdrop, so tasks can still be dragged out of it onto other days.
-function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onClose }) {
+function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onChipDrop, onClose }) {
   const panelRef = useRef(null)
   useEffect(() => {
     if (!open) return
@@ -107,7 +123,7 @@ function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onClose 
               onClose()
               openEditTask(t)
             }}
-            {...dragProps(t, setDragOver)}
+            {...chipProps(t, setDragOver, onChipDrop)}
           />
         ))}
         {items.length === 0 && <p className="py-4 text-center text-xs text-slate-400">No tasks.</p>}
@@ -119,7 +135,17 @@ function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onClose 
 }
 
 export default function Calendar() {
-  const { tasks, openNewTask, openEditTask, rescheduleTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, rescheduleTask, reorderTask, loading } = useData()
+
+  // Drop a task onto another task: reposition it before that task. If they're on
+  // different days it also moves to that day; same day = pure reorder.
+  const onChipDrop = (dragId, target) => {
+    const m = tasks.find((x) => x.id === dragId)
+    if (!m || m.id === target.id) return
+    const dateKey = target.dueDate || target.startDate
+    const sameDay = m.dueDate === dateKey
+    reorderTask(dragId, m.status, target.id, sameDay ? null : { startDate: dateKey, dueDate: dateKey })
+  }
   const [mode, setMode] = useState('week') // 'day' | 'week' | 'month'
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
@@ -129,11 +155,12 @@ export default function Calendar() {
 
   const tasksByDay = useMemo(() => {
     const map = {}
+    // Keep each day in the tasks' own order (manual arrangement / sortIndex), so
+    // drag-to-reorder within a day is reflected and persists.
     for (const t of tasks) {
       if (!t.dueDate) continue
       ;(map[t.dueDate] ||= []).push(t)
     }
-    for (const k in map) map[k].sort(byTime)
     return map
   }, [tasks])
 
@@ -207,7 +234,13 @@ export default function Calendar() {
 
       {/* Body */}
       {mode === 'day' && (
-        <DayView dayKey={toKey(cursor)} tasksByDay={tasksByDay} openNewTask={openNewTask} openEditTask={openEditTask} />
+        <DayView
+          dayKey={toKey(cursor)}
+          tasksByDay={tasksByDay}
+          openNewTask={openNewTask}
+          openEditTask={openEditTask}
+          onChipDrop={onChipDrop}
+        />
       )}
       {mode === 'week' && (
         <WeekView
@@ -216,6 +249,7 @@ export default function Calendar() {
           openNewTask={openNewTask}
           openEditTask={openEditTask}
           onReschedule={rescheduleTask}
+          onChipDrop={onChipDrop}
         />
       )}
       {mode === 'month' && (
@@ -225,6 +259,7 @@ export default function Calendar() {
           openNewTask={openNewTask}
           openEditTask={openEditTask}
           onReschedule={rescheduleTask}
+          onChipDrop={onChipDrop}
         />
       )}
     </div>
@@ -238,8 +273,9 @@ function weekTitle(cursor) {
 }
 
 /* ---------- Day ---------- */
-function DayView({ dayKey, tasksByDay, openNewTask, openEditTask }) {
+function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, onChipDrop }) {
   const items = tasksByDay[dayKey] || []
+  const [overId, setOverId] = useState(null)
   return (
     <div className="flex-1 overflow-y-auto p-4">
       <div className="mx-auto max-w-2xl">
@@ -256,7 +292,28 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask }) {
         </div>
         <div className="space-y-2">
           {items.map((t) => (
-            <AgendaRow key={t.id} t={t} onClick={() => openEditTask(t)} />
+            <AgendaRow
+              key={t.id}
+              t={t}
+              onClick={() => openEditTask(t)}
+              dragOver={overId === t.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(DRAG_MIME, t.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnd={() => setOverId(null)}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (overId !== t.id) setOverId(t.id)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const id = e.dataTransfer.getData(DRAG_MIME)
+                setOverId(null)
+                if (id && id !== t.id) onChipDrop?.(id, t)
+              }}
+            />
           ))}
           {items.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400">
@@ -269,15 +326,19 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask }) {
   )
 }
 
-function AgendaRow({ t, onClick }) {
+function AgendaRow({ t, onClick, dragOver, ...dnd }) {
   const sm = statusMeta(t.status)
   const pm = priorityMeta(t.priority)
   const time = t.startTime ? `${fmtTime(t.startTime)}${t.endTime ? ` – ${fmtTime(t.endTime)}` : ''}` : 'All day'
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:bg-slate-50"
+      {...dnd}
+      className={`flex w-full items-center gap-3 rounded-lg border bg-white p-3 text-left hover:bg-slate-50 ${
+        dragOver ? 'border-brand-400 ring-1 ring-inset ring-brand-300' : 'border-slate-200'
+      } ${dnd.draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
+      <GripVertical size={14} className="shrink-0 text-slate-300" />
       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE[sm.tone].dot}`} />
       <div className="w-28 shrink-0 text-xs text-slate-500">{time}</div>
       <div className="min-w-0 flex-1">
@@ -294,7 +355,7 @@ function AgendaRow({ t, onClick }) {
 }
 
 /* ---------- Week ---------- */
-function WeekView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule }) {
+function WeekView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule, onChipDrop }) {
   const start = startOfWeek(cursor)
   const days = Array.from({ length: 7 }, (_, i) => addDate(start, i))
   const tKey = todayKey()
@@ -335,7 +396,13 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule 
             </div>
             <div className="flex-1 space-y-1 overflow-y-auto p-1.5">
               {items.map((t) => (
-                <TaskChip key={t.id} t={t} showTime onClick={() => openEditTask(t)} {...dragProps(t, setDragOver)} />
+                <TaskChip
+                  key={t.id}
+                  t={t}
+                  showTime
+                  onClick={() => openEditTask(t)}
+                  {...chipProps(t, setDragOver, onChipDrop)}
+                />
               ))}
               <button
                 onClick={() => openNewTask({ startDate: key, dueDate: key })}
@@ -352,7 +419,7 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule 
 }
 
 /* ---------- Month ---------- */
-function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule }) {
+function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule, onChipDrop }) {
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const tKey = todayKey()
@@ -418,7 +485,12 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
                 </div>
                 <div className="space-y-1">
                   {items.slice(0, 3).map((t) => (
-                    <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} {...dragProps(t, setDragOver)} />
+                    <TaskChip
+                      key={t.id}
+                      t={t}
+                      onClick={() => openEditTask(t)}
+                      {...chipProps(t, setDragOver, onChipDrop)}
+                    />
                   ))}
                   {items.length > 3 && (
                     <button
@@ -439,6 +511,7 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
         tasksByDay={tasksByDay}
         openEditTask={openEditTask}
         setDragOver={setDragOver}
+        onChipDrop={onChipDrop}
         onClose={() => setMore(null)}
       />
     </div>
@@ -446,16 +519,14 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
 }
 
 /* ---------- shared ---------- */
-function TaskChip({ t, onClick, showTime, draggable, onDragStart, onDragEnd }) {
+function TaskChip({ t, onClick, showTime, ...dnd }) {
   const tone = statusMeta(t.status).tone
   return (
     <button
       onClick={onClick}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      {...dnd}
       className={`flex w-full items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[11px] font-medium ${TONE[tone].soft} hover:opacity-80 ${
-        draggable ? 'cursor-grab active:cursor-grabbing' : ''
+        dnd.draggable ? 'cursor-grab active:cursor-grabbing' : ''
       }`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE[tone].dot}`} />

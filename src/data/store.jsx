@@ -290,17 +290,17 @@ export function DataProvider({ children }) {
   //   - at the end of the `newStatus` column (drop onto empty space).
   // Persists the whole tasks array so the order survives refresh.
   const reorderTask = useCallback(
-    async (dragId, newStatus, beforeId = null) => {
+    async (dragId, newStatus, beforeId = null, patch = null) => {
       const moving = tasks.find((t) => t.id === dragId)
       if (!moving) return
-      const updated =
-        moving.status === newStatus
-          ? moving
-          : {
-              ...moving,
-              status: newStatus,
-              completedAt: completionStamp(moving.status, moving.completedAt, newStatus),
-            }
+      // `patch` lets a calendar drop also move the task's date while repositioning.
+      const updated = {
+        ...moving,
+        ...(moving.status === newStatus
+          ? null
+          : { status: newStatus, completedAt: completionStamp(moving.status, moving.completedAt, newStatus) }),
+        ...patch,
+      }
 
       let arr = tasks.filter((t) => t.id !== dragId)
       let insertAt
