@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate } from '@/lib/dates'
@@ -32,7 +32,7 @@ const byTime = (a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '
 
 export default function Calendar() {
   const { tasks, openNewTask, openEditTask, loading } = useData()
-  const [mode, setMode] = useState('month') // 'day' | 'week' | 'month'
+  const [mode, setMode] = useState('week') // 'day' | 'week' | 'month'
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
@@ -148,10 +148,10 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask }) {
             {items.length} task{items.length === 1 ? '' : 's'} due
           </span>
           <button
-            onClick={() => openNewTask({ dueDate: dayKey })}
-            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
+            onClick={() => openNewTask({ startDate: dayKey, dueDate: dayKey })}
+            className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
           >
-            + Add
+            <Plus size={15} /> Add task
           </button>
         </div>
         <div className="space-y-2">
@@ -207,31 +207,38 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask }) {
         return (
           <div
             key={i}
-            onDoubleClick={() => openNewTask({ dueDate: key })}
+            onDoubleClick={() => openNewTask({ startDate: key, dueDate: key })}
             className="flex min-h-0 flex-col border-r border-slate-100 last:border-r-0"
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-2 py-2">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{WEEKDAYS[d.getDay()]}</span>
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                  isToday ? 'bg-brand-600 text-white' : 'text-slate-600'
-                }`}
-              >
-                {d.getDate()}
-              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => openNewTask({ startDate: key, dueDate: key })}
+                  title="Add task on this day"
+                  className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                >
+                  <Plus size={14} />
+                </button>
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                    isToday ? 'bg-brand-600 text-white' : 'text-slate-600'
+                  }`}
+                >
+                  {d.getDate()}
+                </span>
+              </div>
             </div>
             <div className="flex-1 space-y-1 overflow-y-auto p-1.5">
               {items.map((t) => (
                 <TaskChip key={t.id} t={t} showTime onClick={() => openEditTask(t)} />
               ))}
-              {items.length === 0 && (
-                <button
-                  onClick={() => openNewTask({ dueDate: key })}
-                  className="w-full rounded py-2 text-center text-[11px] text-slate-300 hover:text-brand-500"
-                >
-                  +
-                </button>
-              )}
+              <button
+                onClick={() => openNewTask({ startDate: key, dueDate: key })}
+                className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-200 py-1.5 text-[11px] font-medium text-slate-400 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600"
+              >
+                <Plus size={12} /> Add task
+              </button>
             </div>
           </div>
         )
@@ -276,7 +283,7 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
             return (
               <div
                 key={i}
-                onDoubleClick={() => openNewTask({ dueDate: key })}
+                onDoubleClick={() => openNewTask({ startDate: key, dueDate: key })}
                 className="group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5"
               >
                 <div className="mb-1 flex items-center justify-between">
@@ -288,11 +295,11 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
                     {date.getDate()}
                   </span>
                   <button
-                    onClick={() => openNewTask({ dueDate: key })}
-                    className="text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-brand-600"
-                    title="Add task"
+                    onClick={() => openNewTask({ startDate: key, dueDate: key })}
+                    className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                    title="Add task on this day"
                   >
-                    +
+                    <Plus size={14} />
                   </button>
                 </div>
                 <div className="space-y-1">
