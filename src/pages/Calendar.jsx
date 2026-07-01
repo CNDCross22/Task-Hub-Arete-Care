@@ -296,10 +296,10 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
                   </span>
                   <button
                     onClick={() => openNewTask({ startDate: key, dueDate: key })}
-                    className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                    className="flex h-5 w-5 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 shadow-sm hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600"
                     title="Add task on this day"
                   >
-                    <Plus size={14} />
+                    <Plus size={13} />
                   </button>
                 </div>
                 <div className="space-y-1">
