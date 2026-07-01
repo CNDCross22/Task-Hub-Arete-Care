@@ -17,7 +17,7 @@ export default function Tasks() {
   const [department, setDepartment] = useState('all')
   const [company, setCompany] = useState('all')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(10)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
