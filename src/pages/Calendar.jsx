@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate } from '@/lib/dates'
@@ -54,6 +55,68 @@ const dropProps = (key, setDragOver, onReschedule) => ({
     if (id) onReschedule?.(id, key)
   },
 })
+
+// Floating panel listing every task on a day (opened from "+N more"). No
+// blocking backdrop, so tasks can still be dragged out of it onto other days.
+function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onClose }) {
+  const panelRef = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onClose()
+    }
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    const close = () => onClose()
+    document.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+  const items = tasksByDay[open.key] || []
+  const width = 244
+  const left = Math.max(8, Math.min(open.rect.left, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(open.rect.bottom + 4, window.innerHeight - 340))
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={{ position: 'fixed', left, top, width }}
+      className="z-[80] flex max-h-80 flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
+    >
+      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+        <span className="text-xs font-semibold text-slate-700">{longDate(open.key)}</span>
+        <button onClick={onClose} title="Close" className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <X size={14} />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        {items.map((t) => (
+          <TaskChip
+            key={t.id}
+            t={t}
+            showTime
+            onClick={() => {
+              onClose()
+              openEditTask(t)
+            }}
+            {...dragProps(t, setDragOver)}
+          />
+        ))}
+        {items.length === 0 && <p className="py-4 text-center text-xs text-slate-400">No tasks.</p>}
+      </div>
+      <p className="border-t border-slate-100 px-3 py-1.5 text-[10px] text-slate-400">Drag a task onto a day to move it.</p>
+    </div>,
+    document.body,
+  )
+}
 
 export default function Calendar() {
   const { tasks, openNewTask, openEditTask, rescheduleTask, loading } = useData()
@@ -294,6 +357,12 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
   const month = cursor.getMonth()
   const tKey = todayKey()
   const [dragOver, setDragOver] = useState(null)
+  const [more, setMore] = useState(null) // { key, rect } — expanded day popover
+  // Rescheduling (incl. dragging out of the "more" popover) also closes it.
+  const reschedule = (id, key) => {
+    setMore(null)
+    onReschedule?.(id, key)
+  }
 
   const cells = useMemo(() => {
     const first = new Date(year, month, 1)
@@ -326,7 +395,7 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
               <div
                 key={i}
                 onDoubleClick={() => openNewTask({ startDate: key, dueDate: key })}
-                {...dropProps(key, setDragOver, onReschedule)}
+                {...dropProps(key, setDragOver, reschedule)}
                 className={`group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5 ${
                   dragOver === key ? 'bg-brand-50 ring-2 ring-inset ring-brand-400' : ''
                 }`}
@@ -352,7 +421,12 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
                     <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} {...dragProps(t, setDragOver)} />
                   ))}
                   {items.length > 3 && (
-                    <span className="px-1.5 text-[11px] text-slate-400">+{items.length - 3} more</span>
+                    <button
+                      onClick={(e) => setMore({ key, rect: e.currentTarget.getBoundingClientRect() })}
+                      className="w-full rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-brand-600"
+                    >
+                      +{items.length - 3} more
+                    </button>
                   )}
                 </div>
               </div>
@@ -360,6 +434,13 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule
           })}
         </div>
       </div>
+      <DayTasksPopover
+        open={more}
+        tasksByDay={tasksByDay}
+        openEditTask={openEditTask}
+        setDragOver={setDragOver}
+        onClose={() => setMore(null)}
+      />
     </div>
   )
 }
