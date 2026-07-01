@@ -4,7 +4,7 @@ import { useData } from '@/data/store'
 import { STATUSES, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
-import { isOverdue } from '@/lib/dates'
+import { isOverdue, medDate } from '@/lib/dates'
 
 export default function Kanban() {
   const { tasks, reorderTask, openNewTask, openEditTask, loading } = useData()
@@ -120,7 +120,7 @@ export default function Kanban() {
                         {t.dueDate ? (
                           <span className={`inline-flex items-center gap-1 text-xs ${overdue ? 'text-rose-600' : 'text-slate-400'}`}>
                             <CalIcon size={12} />
-                            {t.dueDate}
+                            {medDate(t.dueDate)}
                           </span>
                         ) : (
                           <span />

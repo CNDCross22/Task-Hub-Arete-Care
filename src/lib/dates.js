@@ -68,24 +68,27 @@ export const MONTHS = [
 
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+const pad2 = (n) => String(n).padStart(2, '0')
+
+// "30/06" — compact day/month (no year)
 export const prettyDate = (key) => {
   if (!key) return ''
   const d = fromKey(key)
-  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`
 }
 
-// "June 22, 2026"
+// "30/06/2026" — full date, dd/mm/yyyy
 export const longDate = (key) => {
   if (!key) return ''
   const d = fromKey(key)
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
-// "Jun 22, 2026" — compact, fits narrow fields on one line
+// "30/06/2026" — full date, dd/mm/yyyy (alias kept for compact fields)
 export const medDate = (key) => {
   if (!key) return ''
   const d = fromKey(key)
-  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
 // Monday–Friday of the work week containing today, shifted by offsetWeeks

@@ -6,7 +6,7 @@ import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
 import Select from '@/components/Select'
-import { isOverdue } from '@/lib/dates'
+import { isOverdue, medDate } from '@/lib/dates'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
@@ -135,7 +135,7 @@ export default function Tasks() {
                     {t.dueDate ? (
                       <span className={`inline-flex items-center gap-1.5 ${overdue ? 'text-rose-600' : 'text-slate-600'}`}>
                         <CalIcon size={14} />
-                        {t.dueDate}
+                        {medDate(t.dueDate)}
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
