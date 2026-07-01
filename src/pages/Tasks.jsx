@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Calendar as CalIcon, Repeat } from 'lucide-react'
+import { Plus, Search, Calendar as CalIcon, Repeat, GripVertical } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta } from '@/data/config'
 import Badge from '@/components/Badge'
@@ -10,8 +10,10 @@ import { isOverdue, medDate } from '@/lib/dates'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
-  const { tasks, openNewTask, openEditTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, reorderTask, loading } = useData()
   const [q, setQ] = useState('')
+  const [dragId, setDragId] = useState(null)
+  const [overId, setOverId] = useState(null)
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
   const [department, setDepartment] = useState('all')
@@ -102,9 +104,43 @@ export default function Tasks() {
               const pm = priorityMeta(t.priority)
               const overdue = isOverdue(t)
               return (
-                <tr key={t.id} onClick={() => openEditTask(t)} className="cursor-pointer hover:bg-slate-50">
+                <tr
+                  key={t.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/task-id', t.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                    setDragId(t.id)
+                  }}
+                  onDragEnd={() => {
+                    setDragId(null)
+                    setOverId(null)
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    if (overId !== t.id) setOverId(t.id)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const id = e.dataTransfer.getData('text/task-id')
+                    setOverId(null)
+                    setDragId(null)
+                    if (id && id !== t.id) {
+                      const moving = tasks.find((x) => x.id === id)
+                      reorderTask(id, moving?.status, t.id)
+                    }
+                  }}
+                  onClick={() => openEditTask(t)}
+                  className={`cursor-pointer transition-colors ${dragId === t.id ? 'opacity-40' : ''} ${
+                    overId === t.id && dragId && dragId !== t.id ? 'bg-brand-50' : 'hover:bg-slate-50'
+                  }`}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
+                      <GripVertical
+                        size={14}
+                        className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+                      />
                       <span className="font-medium text-slate-800">{t.title}</span>
                       {t.recurring && (
                         <span
