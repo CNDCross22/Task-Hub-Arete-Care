@@ -37,8 +37,12 @@ export function AuthProvider({ children }) {
     Promise.resolve(revalidate).then((data) => {
       if (!active) return
       if (data && data.active !== false) {
-        setMember(data)
-        localStorage.setItem(SESSION_KEY, JSON.stringify(data))
+        // The login response no longer includes the access code (it's hashed and
+        // stripped server-side), so re-attach the stored code that the client
+        // replays on every request — otherwise writes would 401 after a reload.
+        const session = { ...data, accessCode: stored.accessCode }
+        setMember(session)
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       } else {
         localStorage.removeItem(SESSION_KEY)
         setMember(null)
