@@ -257,8 +257,6 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
     return grid
   }, [year, month])
 
-  const rows = cells.length / 7
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="grid grid-cols-7 border-b border-slate-100 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -266,45 +264,49 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
           <div key={w} className="py-2">{w}</div>
         ))}
       </div>
-      <div className="grid flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
-        {cells.map((date, i) => {
-          if (!date) return <div key={i} className="border-b border-r border-slate-100 bg-slate-50/50" />
-          const key = toKey(date)
-          const items = tasksByDay[key] || []
-          const isToday = key === tKey
-          return (
-            <div
-              key={i}
-              onDoubleClick={() => openNewTask({ dueDate: key })}
-              className="group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5"
-            >
-              <div className="mb-1 flex items-center justify-between">
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                    isToday ? 'bg-brand-600 text-white' : 'text-slate-500'
-                  }`}
-                >
-                  {date.getDate()}
-                </span>
-                <button
-                  onClick={() => openNewTask({ dueDate: key })}
-                  className="text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-brand-600"
-                  title="Add task"
-                >
-                  +
-                </button>
+      {/* Fixed, compact rows so cells stay a sensible size on tall screens
+          instead of stretching; the grid scrolls if a month needs more room. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-7" style={{ gridAutoRows: 'minmax(7rem, auto)' }}>
+          {cells.map((date, i) => {
+            if (!date) return <div key={i} className="border-b border-r border-slate-100 bg-slate-50/50" />
+            const key = toKey(date)
+            const items = tasksByDay[key] || []
+            const isToday = key === tKey
+            return (
+              <div
+                key={i}
+                onDoubleClick={() => openNewTask({ dueDate: key })}
+                className="group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5"
+              >
+                <div className="mb-1 flex items-center justify-between">
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                      isToday ? 'bg-brand-600 text-white' : 'text-slate-500'
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+                  <button
+                    onClick={() => openNewTask({ dueDate: key })}
+                    className="text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-brand-600"
+                    title="Add task"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {items.slice(0, 3).map((t) => (
+                    <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} />
+                  ))}
+                  {items.length > 3 && (
+                    <span className="px-1.5 text-[11px] text-slate-400">+{items.length - 3} more</span>
+                  )}
+                </div>
               </div>
-              <div className="space-y-1 overflow-y-auto">
-                {items.slice(0, 4).map((t) => (
-                  <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} />
-                ))}
-                {items.length > 4 && (
-                  <span className="px-1.5 text-[11px] text-slate-400">+{items.length - 4} more</span>
-                )}
-              </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </div>
   )
