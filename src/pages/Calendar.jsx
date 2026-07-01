@@ -30,8 +30,33 @@ const startOfWeek = (d) => {
 }
 const byTime = (a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99')
 
+// Drag-and-drop: chips carry their task id; a day cell/column is a drop target
+// that reschedules the dropped task onto its date.
+const DRAG_MIME = 'text/task-id'
+const dragProps = (t, setDragOver) => ({
+  draggable: true,
+  onDragStart: (e) => {
+    e.dataTransfer.setData(DRAG_MIME, t.id)
+    e.dataTransfer.effectAllowed = 'move'
+  },
+  onDragEnd: () => setDragOver(null),
+})
+const dropProps = (key, setDragOver, onReschedule) => ({
+  onDragOver: (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(key)
+  },
+  onDrop: (e) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData(DRAG_MIME)
+    setDragOver(null)
+    if (id) onReschedule?.(id, key)
+  },
+})
+
 export default function Calendar() {
-  const { tasks, openNewTask, openEditTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, rescheduleTask, loading } = useData()
   const [mode, setMode] = useState('week') // 'day' | 'week' | 'month'
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
@@ -122,10 +147,22 @@ export default function Calendar() {
         <DayView dayKey={toKey(cursor)} tasksByDay={tasksByDay} openNewTask={openNewTask} openEditTask={openEditTask} />
       )}
       {mode === 'week' && (
-        <WeekView cursor={cursor} tasksByDay={tasksByDay} openNewTask={openNewTask} openEditTask={openEditTask} />
+        <WeekView
+          cursor={cursor}
+          tasksByDay={tasksByDay}
+          openNewTask={openNewTask}
+          openEditTask={openEditTask}
+          onReschedule={rescheduleTask}
+        />
       )}
       {mode === 'month' && (
-        <MonthView cursor={cursor} tasksByDay={tasksByDay} openNewTask={openNewTask} openEditTask={openEditTask} />
+        <MonthView
+          cursor={cursor}
+          tasksByDay={tasksByDay}
+          openNewTask={openNewTask}
+          openEditTask={openEditTask}
+          onReschedule={rescheduleTask}
+        />
       )}
     </div>
   )
@@ -194,10 +231,11 @@ function AgendaRow({ t, onClick }) {
 }
 
 /* ---------- Week ---------- */
-function WeekView({ cursor, tasksByDay, openNewTask, openEditTask }) {
+function WeekView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule }) {
   const start = startOfWeek(cursor)
   const days = Array.from({ length: 7 }, (_, i) => addDate(start, i))
   const tKey = todayKey()
+  const [dragOver, setDragOver] = useState(null)
   return (
     <div className="grid flex-1 grid-cols-7 overflow-hidden">
       {days.map((d, i) => {
@@ -208,7 +246,10 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask }) {
           <div
             key={i}
             onDoubleClick={() => openNewTask({ startDate: key, dueDate: key })}
-            className="flex min-h-0 flex-col border-r border-slate-100 last:border-r-0"
+            {...dropProps(key, setDragOver, onReschedule)}
+            className={`flex min-h-0 flex-col border-r border-slate-100 last:border-r-0 ${
+              dragOver === key ? 'bg-brand-50 ring-2 ring-inset ring-brand-400' : ''
+            }`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-2 py-2">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{WEEKDAYS[d.getDay()]}</span>
@@ -231,7 +272,7 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask }) {
             </div>
             <div className="flex-1 space-y-1 overflow-y-auto p-1.5">
               {items.map((t) => (
-                <TaskChip key={t.id} t={t} showTime onClick={() => openEditTask(t)} />
+                <TaskChip key={t.id} t={t} showTime onClick={() => openEditTask(t)} {...dragProps(t, setDragOver)} />
               ))}
               <button
                 onClick={() => openNewTask({ startDate: key, dueDate: key })}
@@ -248,10 +289,11 @@ function WeekView({ cursor, tasksByDay, openNewTask, openEditTask }) {
 }
 
 /* ---------- Month ---------- */
-function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
+function MonthView({ cursor, tasksByDay, openNewTask, openEditTask, onReschedule }) {
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const tKey = todayKey()
+  const [dragOver, setDragOver] = useState(null)
 
   const cells = useMemo(() => {
     const first = new Date(year, month, 1)
@@ -284,7 +326,10 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
               <div
                 key={i}
                 onDoubleClick={() => openNewTask({ startDate: key, dueDate: key })}
-                className="group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5"
+                {...dropProps(key, setDragOver, onReschedule)}
+                className={`group flex min-h-0 flex-col border-b border-r border-slate-100 p-1.5 ${
+                  dragOver === key ? 'bg-brand-50 ring-2 ring-inset ring-brand-400' : ''
+                }`}
               >
                 <div className="mb-1 flex items-center justify-between">
                   <span
@@ -304,7 +349,7 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
                 </div>
                 <div className="space-y-1">
                   {items.slice(0, 3).map((t) => (
-                    <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} />
+                    <TaskChip key={t.id} t={t} onClick={() => openEditTask(t)} {...dragProps(t, setDragOver)} />
                   ))}
                   {items.length > 3 && (
                     <span className="px-1.5 text-[11px] text-slate-400">+{items.length - 3} more</span>
@@ -320,12 +365,17 @@ function MonthView({ cursor, tasksByDay, openNewTask, openEditTask }) {
 }
 
 /* ---------- shared ---------- */
-function TaskChip({ t, onClick, showTime }) {
+function TaskChip({ t, onClick, showTime, draggable, onDragStart, onDragEnd }) {
   const tone = statusMeta(t.status).tone
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[11px] font-medium ${TONE[tone].soft} hover:opacity-80`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`flex w-full items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[11px] font-medium ${TONE[tone].soft} hover:opacity-80 ${
+        draggable ? 'cursor-grab active:cursor-grabbing' : ''
+      }`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE[tone].dot}`} />
       {showTime && t.startTime && <span className="shrink-0 tabular-nums opacity-70">{fmtTime(t.startTime)}</span>}

@@ -261,6 +261,30 @@ export function DataProvider({ children }) {
 
   const moveTask = useCallback((id, status) => updateTask(id, { status }), [updateTask])
 
+  // Drag-to-reschedule on the calendar. Optimistic (snaps back on failure).
+  // Single-day tasks move whole; multi-day keep their start (clamped if the
+  // new due date would fall before it).
+  const rescheduleTask = useCallback(
+    async (id, dateKey) => {
+      const t = tasks.find((x) => x.id === id)
+      if (!t || !dateKey || t.dueDate === dateKey) return
+      const singleDay = !t.startDate || t.startDate === t.dueDate
+      const patch =
+        singleDay || (t.startDate && t.startDate > dateKey)
+          ? { startDate: dateKey, dueDate: dateKey }
+          : { dueDate: dateKey }
+      const prev = tasks
+      setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+      try {
+        await backend.update('tasks', id, patch)
+      } catch {
+        setTasks(prev)
+        toast.error('Couldn’t move the task')
+      }
+    },
+    [tasks, toast],
+  )
+
   // Drag-and-drop reorder. Removes the dragged task and re-inserts it:
   //   - before `beforeId` when given (drop onto a card), else
   //   - at the end of the `newStatus` column (drop onto empty space).
@@ -421,6 +445,7 @@ export function DataProvider({ children }) {
       deleteSeries,
       moveTask,
       reorderTask,
+      rescheduleTask,
       createProject,
       updateProject,
       removeProject,
@@ -448,6 +473,7 @@ export function DataProvider({ children }) {
       deleteSeries,
       moveTask,
       reorderTask,
+      rescheduleTask,
       createProject,
       updateProject,
       removeProject,
