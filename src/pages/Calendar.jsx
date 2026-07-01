@@ -82,16 +82,15 @@ function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onChipDr
       if (panelRef.current && !panelRef.current.contains(e.target)) onClose()
     }
     const onKey = (e) => e.key === 'Escape' && onClose()
-    const close = () => onClose()
+    // Note: intentionally NOT closing on scroll — scrolling the month grid (or
+    // the popover's own list) should keep it open. Close via click-out/Esc/X.
     document.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
+    window.addEventListener('resize', onClose)
     return () => {
       document.removeEventListener('mousedown', onDown)
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
+      window.removeEventListener('resize', onClose)
     }
   }, [open, onClose])
 
