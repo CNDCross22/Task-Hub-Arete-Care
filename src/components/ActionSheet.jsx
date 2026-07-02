@@ -13,7 +13,7 @@ export default function ActionSheet({ open, title, onClose, children }) {
         onClick={onClose}
       />
       <div
-        className={`fixed inset-x-0 bottom-0 z-[71] max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl ${
+        className={`fixed inset-x-0 bottom-0 z-[71] max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl ${
           closing ? 'animate-sheet-down' : 'animate-sheet-up'
         }`}
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Calendar as CalIcon, Repeat, GripVertical } from 'lucide-react'
+import { Plus, Search, Calendar as CalIcon, Repeat, GripVertical, SlidersHorizontal } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta } from '@/data/config'
 import Badge from '@/components/Badge'
@@ -20,6 +20,21 @@ export default function Tasks() {
   const [company, setCompany] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [showFilters, setShowFilters] = useState(false)
+
+  const filterDefs = [
+    { value: status, onChange: setStatus, all: 'All statuses', options: STATUSES },
+    { value: priority, onChange: setPriority, all: 'All priorities', options: PRIORITIES },
+    { value: department, onChange: setDepartment, all: 'All departments', options: DEPARTMENTS.map((d) => ({ key: d, label: d })) },
+    { value: company, onChange: setCompany, all: 'All companies', options: COMPANIES.map((c) => ({ key: c, label: c })) },
+  ]
+  const activeFilters = filterDefs.filter((f) => f.value !== 'all').length
+  const clearFilters = () => {
+    setStatus('all')
+    setPriority('all')
+    setDepartment('all')
+    setCompany('all')
+  }
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -54,34 +69,70 @@ export default function Tasks() {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-auto">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search tasks…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:w-56"
-          />
-        </div>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-auto">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search tasks…"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:w-56"
+            />
+          </div>
 
-        <FilterSelect value={status} onChange={setStatus} all="All statuses" options={STATUSES} />
-        <FilterSelect value={priority} onChange={setPriority} all="All priorities" options={PRIORITIES} />
-        <FilterSelect value={department} onChange={setDepartment} all="All departments" options={DEPARTMENTS.map((d) => ({ key: d, label: d }))} />
-        <FilterSelect value={company} onChange={setCompany} all="All companies" options={COMPANIES.map((c) => ({ key: c, label: c }))} />
-
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-slate-400">
-            {collapsed.length} row{collapsed.length === 1 ? '' : 's'}
-          </span>
+          {/* Phone: toggle the filter panel; from sm up the selects sit inline */}
           <button
-            onClick={() => openNewTask()}
-            className="hidden items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 sm:inline-flex"
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 sm:hidden"
           >
-            <Plus size={16} />
-            Add Task
+            <SlidersHorizontal size={16} />
+            Filters
+            {activeFilters > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-100 px-1 text-xs font-semibold text-brand-700">
+                {activeFilters}
+              </span>
+            )}
           </button>
+
+          <div className="hidden sm:contents">
+            {filterDefs.map((f, i) => (
+              <FilterSelect key={i} value={f.value} onChange={f.onChange} all={f.all} options={f.options} />
+            ))}
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-sm text-slate-400">
+              {collapsed.length} row{collapsed.length === 1 ? '' : 's'}
+            </span>
+            <button
+              onClick={() => openNewTask()}
+              className="hidden items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 sm:inline-flex"
+            >
+              <Plus size={16} />
+              Add Task
+            </button>
+          </div>
         </div>
+
+        {/* Phone-only expandable filter panel */}
+        {showFilters && (
+          <div className="grid grid-cols-2 gap-2 sm:hidden">
+            {filterDefs.map((f, i) => (
+              <FilterSelect key={i} value={f.value} onChange={f.onChange} all={f.all} options={f.options} className="w-full" />
+            ))}
+            {activeFilters > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="col-span-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table (desktop) */}
@@ -259,10 +310,10 @@ function TaskCard({ t, onClick }) {
   )
 }
 
-function FilterSelect({ value, onChange, all, options }) {
+function FilterSelect({ value, onChange, all, options, className = 'w-40' }) {
   const opts = [{ value: 'all', label: all }, ...options.map((o) => ({ value: o.key, label: o.label }))]
   return (
-    <div className="w-40">
+    <div className={className}>
       <Select value={value} onChange={onChange} options={opts} />
     </div>
   )

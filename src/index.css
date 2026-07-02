@@ -32,6 +32,14 @@ textarea,
   main {
     overscroll-behavior-y: contain;
   }
+
+  /* iOS Safari zooms the whole page when a focused control is < 16px. Keep
+     form controls at 16px on touch layouts so focusing never triggers zoom. */
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 /* Smooth, consistent micro-transitions on every interactive element so nothing

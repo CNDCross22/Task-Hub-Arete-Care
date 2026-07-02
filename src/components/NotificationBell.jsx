@@ -68,7 +68,7 @@ export default function NotificationBell() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
-            className={`absolute right-0 z-20 mt-2 w-80 origin-top-right rounded-xl border border-slate-200 bg-white shadow-lg ${
+            className={`absolute right-0 z-20 mt-2 w-[calc(100vw-1.5rem)] origin-top-right rounded-xl border border-slate-200 bg-white shadow-lg sm:w-80 ${
               closing ? 'animate-scale-out' : 'animate-scale-in'
             }`}
           >

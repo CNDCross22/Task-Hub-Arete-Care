@@ -124,7 +124,7 @@ export default function TaskModal() {
     >
       <form
         onSubmit={handleSave}
-        className={`max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 sm:my-2 sm:max-h-none sm:rounded-2xl ${
+        className={`max-h-[92dvh] w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 sm:my-2 sm:max-h-none sm:rounded-2xl ${
           closing ? 'animate-sheet-down sm:animate-scale-out' : 'animate-sheet-up sm:animate-scale-in'
         }`}
       >
@@ -141,7 +141,7 @@ export default function TaskModal() {
           </button>
         </div>
 
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 pb-2 pt-2">
+        <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-6 pb-2 pt-2">
           {/* Title */}
           <Field label="Task Title" required>
             <input

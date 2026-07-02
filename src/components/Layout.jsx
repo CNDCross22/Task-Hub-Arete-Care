@@ -28,7 +28,7 @@ export default function Layout({ children }) {
   // --- Mobile / tablet shell: bottom tab bar, condensed top bar, FAB ---
   if (!isDesktop) {
     return (
-      <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+      <div className="flex h-dvh flex-col overflow-hidden bg-slate-50">
         {busy && <BusyBar />}
         <MobileTopbar title={active.label} />
         <main key={pathname} className="flex-1 animate-fade-in overflow-y-auto px-3 py-4 pb-24">
@@ -59,7 +59,10 @@ export default function Layout({ children }) {
 function MobileTopbar({ title }) {
   const [searchOpen, setSearchOpen] = useState(false)
   return (
-    <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-white">
+    <header
+      className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-white"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <div className="flex h-14 items-center justify-between px-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
