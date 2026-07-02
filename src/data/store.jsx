@@ -312,24 +312,24 @@ export function DataProvider({ children }) {
     [tasks, toast],
   )
 
-  // Drag-and-drop reorder. Removes the dragged task and re-inserts it:
-  //   - before `beforeId` when given (drop onto a card), else
-  //   - at the end of the `newStatus` column (drop onto empty space).
-  // Persists the whole tasks array so the order survives refresh.
+  // Drag-and-drop reorder. Removes the dragged task and re-inserts it before
+  // `beforeId` (drop onto a card), else at the end of the `newStatus` column.
+  // `patch` lets a calendar drop also move the task's date while repositioning.
+  //
+  // Fast path: give the moved task a fractional sortIndex BETWEEN its new
+  // neighbours and write only that one row. Fallback (a neighbour has no numeric
+  // sortIndex yet, or the gap is exhausted): renumber the whole list. Fallbacks
+  // normalise every row, so subsequent reorders stay on the fast single-row path.
   const reorderTask = useCallback(
     async (dragId, newStatus, beforeId = null, patch = null) => {
       const moving = tasks.find((t) => t.id === dragId)
       if (!moving) return
-      // `patch` lets a calendar drop also move the task's date while repositioning.
-      const updated = {
-        ...moving,
-        ...(moving.status === newStatus
+      const statusPatch =
+        moving.status === newStatus
           ? null
-          : { status: newStatus, completedAt: completionStamp(moving.status, moving.completedAt, newStatus) }),
-        ...patch,
-      }
+          : { status: newStatus, completedAt: completionStamp(moving.status, moving.completedAt, newStatus) }
 
-      let arr = tasks.filter((t) => t.id !== dragId)
+      const arr = tasks.filter((t) => t.id !== dragId)
       let insertAt
       if (beforeId && beforeId !== dragId) {
         insertAt = arr.findIndex((t) => t.id === beforeId)
@@ -341,14 +341,38 @@ export function DataProvider({ children }) {
         })
         insertAt = lastIdx === -1 ? arr.length : lastIdx + 1
       }
-      arr = [...arr.slice(0, insertAt), updated, ...arr.slice(insertAt)]
 
-      // Optimistic move; revert + warn if the save doesn't land. (No success
-      // toast — drag/drop is frequent and the move itself is the feedback.)
+      const above = arr[insertAt - 1]
+      const below = arr[insertAt]
+      const ai = typeof above?.sortIndex === 'number' ? above.sortIndex : null
+      const bi = typeof below?.sortIndex === 'number' ? below.sortIndex : null
+      let newIndex = null
+      if (ai !== null && bi !== null) {
+        if (bi - ai > 1e-6) newIndex = (ai + bi) / 2
+      } else if (ai !== null && !below) newIndex = ai + 1
+      else if (bi !== null && !above) newIndex = bi - 1
+
       const prev = tasks
-      setTasks(arr)
+
+      if (newIndex !== null) {
+        const changes = { ...statusPatch, ...patch, sortIndex: newIndex }
+        const updated = { ...moving, ...changes }
+        setTasks([...arr.slice(0, insertAt), updated, ...arr.slice(insertAt)])
+        try {
+          await backend.update('tasks', dragId, changes)
+        } catch {
+          setTasks(prev)
+          toast.error('Couldn’t move the task')
+        }
+        return
+      }
+
+      // Fallback: rewrite the whole order (replace re-stamps sortIndex by position).
+      const updated = { ...moving, ...statusPatch, ...patch }
+      const reordered = [...arr.slice(0, insertAt), updated, ...arr.slice(insertAt)]
+      setTasks(reordered.map((t, i) => ({ ...t, sortIndex: i })))
       try {
-        await backend.replace('tasks', arr)
+        await backend.replace('tasks', reordered)
       } catch {
         setTasks(prev)
         toast.error('Couldn’t move the task')
