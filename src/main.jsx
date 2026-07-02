@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthProvider.jsx'
 import AuthGate from './auth/AuthGate.jsx'
 import { ToastProvider } from './components/Toast.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { registerSW } from './lib/registerSW'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -26,3 +27,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>,
 )
+
+registerSW()

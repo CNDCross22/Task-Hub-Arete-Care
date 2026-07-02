@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Plus, MoreHorizontal, LogOut, X } from 'lucide-react'
+import { Plus, MoreHorizontal, LogOut, X, Download } from 'lucide-react'
 import { navItems } from '@/navigation'
 import { useAuth, memberName, memberInitials } from '@/auth/AuthProvider'
 import { useData } from '@/data/store'
 import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
+import { usePWAInstall } from '@/lib/usePWAInstall'
 
 // The four operational views live in the bottom bar; everything else is behind "More".
 const PRIMARY = ['daily-ops', 'tasks', 'kanban', 'calendar']
@@ -13,6 +14,7 @@ const shortLabel = (l) => l.replace(' Boards', '').replace(' Board', '')
 export default function MobileNav() {
   const { isAdmin, member, signOut } = useAuth()
   const { openNewTask } = useData()
+  const { canInstall, install } = usePWAInstall()
   const [moreOpen, setMoreOpen] = useState(false)
   const { render, closing } = useAnimatedPresence(moreOpen)
 
@@ -108,6 +110,15 @@ export default function MobileNav() {
                 </NavLink>
               ))}
             </div>
+
+            {canInstall && (
+              <button
+                onClick={install}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white"
+              >
+                <Download size={16} /> Install app
+              </button>
+            )}
 
             {member && (
               <button
