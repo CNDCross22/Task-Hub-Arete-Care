@@ -168,33 +168,36 @@ function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
 
   return (
     <div className="space-y-3">
-      {/* Status tabs — stay pinned while the card list scrolls */}
-      <div className="sticky top-0 z-10 -mx-3 -mt-4 flex gap-2 overflow-x-auto bg-slate-50 px-3 pb-2 pt-4">
-        {STATUSES.map((s) => {
-          const count = tasks.filter((t) => t.status === s.key).length
-          const active = s.key === status
-          return (
-            <button
-              key={s.key}
-              onClick={() => setStatus(s.key)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
-                active ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${TONE[s.tone].dot}`} />
-              {s.label}
-              <span className={`rounded-full px-1.5 text-xs ${active ? 'bg-brand-100' : 'bg-slate-100'}`}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Sticky header: the status tabs AND the add button stay pinned, so the
+          "Add to …" action is never hidden behind the tabs while scrolling. */}
+      <div className="sticky top-0 z-10 -mx-3 -mt-4 space-y-2 bg-slate-50 px-3 pb-2 pt-4">
+        <div className="flex gap-2 overflow-x-auto">
+          {STATUSES.map((s) => {
+            const count = tasks.filter((t) => t.status === s.key).length
+            const active = s.key === status
+            return (
+              <button
+                key={s.key}
+                onClick={() => setStatus(s.key)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                  active ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${TONE[s.tone].dot}`} />
+                {s.label}
+                <span className={`rounded-full px-1.5 text-xs ${active ? 'bg-brand-100' : 'bg-slate-100'}`}>{count}</span>
+              </button>
+            )
+          })}
+        </div>
 
-      <button
-        onClick={() => openNewTask({ status })}
-        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500"
-      >
-        <Plus size={16} /> Add to {label}
-      </button>
+        <button
+          onClick={() => openNewTask({ status })}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 py-2.5 text-sm font-medium text-slate-500"
+        >
+          <Plus size={16} /> Add to {label}
+        </button>
+      </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
         {colTasks.map((t) => {
