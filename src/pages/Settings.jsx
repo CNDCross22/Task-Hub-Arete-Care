@@ -45,27 +45,27 @@ export default function Settings() {
           {projects.length === 0 && <li className="py-3 text-sm text-slate-400">No projects yet.</li>}
         </ul>
 
-        <form onSubmit={addProject} className="mt-3 flex items-center gap-2">
+        <form onSubmit={addProject} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="New project name"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:flex-1"
           />
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-1.5">
             {COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                className={`h-6 w-6 rounded-full ${TONE[c].dot} ${color === c ? 'ring-2 ring-offset-2 ring-slate-400' : ''}`}
+                className={`h-6 w-6 shrink-0 rounded-full ${TONE[c].dot} ${color === c ? 'ring-2 ring-slate-400 ring-offset-2' : ''}`}
                 title={c}
               />
             ))}
           </div>
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 sm:w-auto"
           >
             <Plus size={16} />
             Add
