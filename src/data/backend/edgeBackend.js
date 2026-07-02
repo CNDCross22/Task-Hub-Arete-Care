@@ -45,6 +45,10 @@ export function createEdgeBackend() {
       await call('create', { collection, item })
       return item
     },
+    async createMany(collection, items) {
+      await call('createMany', { collection, items })
+      return items
+    },
     async update(collection, id, patch) {
       await call('update', { collection, id, patch })
       return { id, ...patch }

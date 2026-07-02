@@ -180,6 +180,16 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true })
       }
 
+      case 'createMany': {
+        if (badCollection()) return json({ error: 'Unknown collection' }, 400)
+        if (guard()) return json({ error: 'Admin only' }, 403)
+        if (!Array.isArray(items) || items.length === 0) return json({ error: 'items must be a non-empty array' }, 400)
+        const rows = collection === 'members' ? await Promise.all(items.map(withHashedCode)) : items
+        const { error } = await admin.from(collection).insert(rows)
+        if (error) throw error
+        return json({ ok: true })
+      }
+
       case 'update': {
         if (badCollection()) return json({ error: 'Unknown collection' }, 400)
         if (guard()) return json({ error: 'Admin only' }, 403)

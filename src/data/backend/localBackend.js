@@ -45,6 +45,11 @@ export function createLocalBackend(seed) {
       persist(db)
       return item
     },
+    async createMany(collection, items) {
+      db = { ...db, [collection]: [...items, ...(db[collection] || [])] }
+      persist(db)
+      return items
+    },
     async update(collection, id, patch) {
       db = {
         ...db,

@@ -37,6 +37,12 @@ export function createSupabaseBackend() {
       return item
     },
 
+    async createMany(collection, items) {
+      const { error } = await supabase.from(collection).insert(items)
+      if (error) throw error
+      return items
+    },
+
     async update(collection, id, patch) {
       const { error } = await supabase.from(collection).update(patch).eq('id', id)
       if (error) throw error
