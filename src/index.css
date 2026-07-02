@@ -16,6 +16,24 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
 
+/* Touch behavior: kill the grey tap-flash, the 300ms delay, and double-tap
+   zoom on controls; stop scroll-chaining so bottom sheets don't drag the page. */
+a,
+button,
+select,
+input,
+textarea,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (max-width: 1023px) {
+  main {
+    overscroll-behavior-y: contain;
+  }
+}
+
 /* Smooth, consistent micro-transitions on every interactive element so nothing
    snaps (hover colors, focus rings, shadows, transforms all ease). */
 @layer base {

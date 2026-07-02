@@ -168,8 +168,8 @@ function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
 
   return (
     <div className="space-y-3">
-      {/* Status tabs */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
+      {/* Status tabs — stay pinned while the card list scrolls */}
+      <div className="sticky top-0 z-10 -mx-3 -mt-4 flex gap-2 overflow-x-auto bg-slate-50 px-3 pb-2 pt-4">
         {STATUSES.map((s) => {
           const count = tasks.filter((t) => t.status === s.key).length
           const active = s.key === status
@@ -196,7 +196,7 @@ function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
         <Plus size={16} /> Add to {label}
       </button>
 
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {colTasks.map((t) => {
           const pm = priorityMeta(t.priority)
           const overdue = isOverdue(t)
@@ -228,7 +228,7 @@ function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
           )
         })}
         {colTasks.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400 sm:col-span-2">
             No tasks in {label}.
           </div>
         )}

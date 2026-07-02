@@ -558,12 +558,22 @@ function MobileCalendar({ tasks, openNewTask, openEditTask, rescheduleTask }) {
   const dayKey = toKey(cursor)
   const tKey = todayKey()
   const items = tasks.filter((t) => t.dueDate === dayKey)
-  const shift = (n) =>
-    setCursor((c) => {
-      const d = new Date(c)
-      d.setDate(d.getDate() + n)
-      return d
-    })
+
+  // Tasks-per-day, so the week strip can show an activity dot under each date.
+  const countByDay = useMemo(() => {
+    const m = {}
+    for (const t of tasks) if (t.dueDate) m[t.dueDate] = (m[t.dueDate] || 0) + 1
+    return m
+  }, [tasks])
+
+  const weekStart = startOfWeek(cursor)
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDate(weekStart, i))
+  const shiftWeek = (n) => setCursor((c) => addDate(c, n * 7))
+  const selectDay = (d) => {
+    const x = new Date(d)
+    x.setHours(0, 0, 0, 0)
+    setCursor(x)
+  }
   const goToday = () => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
@@ -572,21 +582,61 @@ function MobileCalendar({ tasks, openNewTask, openEditTask, rescheduleTask }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-2 py-2">
-        <button onClick={goToday} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600">
+      {/* Month + week navigation */}
+      <div className="flex items-center justify-between">
+        <button onClick={goToday} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600">
           Today
         </button>
+        <span className="text-sm font-semibold text-slate-800">
+          {MONTHS[cursor.getMonth()]} {cursor.getFullYear()}
+        </span>
         <div className="flex items-center gap-1">
-          <button onClick={() => shift(-1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => shiftWeek(-1)} aria-label="Previous week" className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100">
             <ChevronLeft size={18} />
           </button>
-          <span className={`min-w-[8.5rem] text-center text-sm font-semibold ${dayKey === tKey ? 'text-brand-700' : 'text-slate-800'}`}>
-            {WEEKDAYS[cursor.getDay()]}, {medDate(dayKey)}
-          </span>
-          <button onClick={() => shift(1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => shiftWeek(1)} aria-label="Next week" className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100">
             <ChevronRight size={18} />
           </button>
         </div>
+      </div>
+
+      {/* Week strip — tap a day to jump; dot marks days with tasks */}
+      <div className="grid grid-cols-7 gap-1">
+        {weekDays.map((d) => {
+          const k = toKey(d)
+          const selected = k === dayKey
+          const isToday = k === tKey
+          const has = countByDay[k]
+          return (
+            <button
+              key={k}
+              onClick={() => selectDay(d)}
+              className={`flex flex-col items-center gap-1 rounded-xl border py-2 ${
+                selected
+                  ? 'border-brand-500 bg-brand-600 text-white'
+                  : isToday
+                    ? 'border-brand-200 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              <span className="text-[10px] font-medium uppercase opacity-80">{WEEKDAYS[d.getDay()]}</span>
+              <span className="text-sm font-semibold">{d.getDate()}</span>
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${has ? (selected ? 'bg-white' : 'bg-brand-500') : 'bg-transparent'}`}
+              />
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Selected-day heading */}
+      <div className="flex items-center justify-between pt-1">
+        <h3 className="text-sm font-semibold text-slate-800">
+          {WEEKDAYS_FULL[cursor.getDay()]}, {medDate(dayKey)}
+        </h3>
+        <span className="text-xs text-slate-400">
+          {items.length} task{items.length === 1 ? '' : 's'}
+        </span>
       </div>
 
       <button
@@ -596,7 +646,7 @@ function MobileCalendar({ tasks, openNewTask, openEditTask, rescheduleTask }) {
         <Plus size={16} /> Add task
       </button>
 
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {items.map((t) => {
           const sm = statusMeta(t.status)
           const pm = priorityMeta(t.priority)
@@ -627,7 +677,7 @@ function MobileCalendar({ tasks, openNewTask, openEditTask, rescheduleTask }) {
           )
         })}
         {items.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400 sm:col-span-2">
             No tasks due this day.
           </div>
         )}

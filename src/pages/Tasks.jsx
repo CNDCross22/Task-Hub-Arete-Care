@@ -199,11 +199,13 @@ export default function Tasks() {
         />
       </div>
 
-      {/* Cards (mobile / tablet) */}
+      {/* Cards (mobile / tablet) — two columns once there's tablet width */}
       <div className="space-y-2 lg:hidden">
-        {paged.map((t) => (
-          <TaskCard key={t.id} t={t} onClick={() => openEditTask(t)} />
-        ))}
+        <div className="grid gap-2 sm:grid-cols-2">
+          {paged.map((t) => (
+            <TaskCard key={t.id} t={t} onClick={() => openEditTask(t)} />
+          ))}
+        </div>
         {filtered.length === 0 && (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white py-12 text-center text-sm text-slate-400">
             No tasks match your filters.

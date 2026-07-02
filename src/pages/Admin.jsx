@@ -165,8 +165,8 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
         </table>
       </div>
 
-      {/* People list — cards (mobile / tablet) */}
-      <div className="space-y-2 lg:hidden">
+      {/* People list — cards (mobile / tablet), two columns on tablet width */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:hidden">
         {members.map((m) => (
           <MobileMemberCard
             key={m.id}
@@ -177,7 +177,7 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
           />
         ))}
         {members.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400 sm:col-span-2">
             No people yet. Add someone above.
           </div>
         )}

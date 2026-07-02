@@ -185,7 +185,7 @@ export default function WeeklyReport() {
 
         {state.text && !state.loading && (
           /* Document-style preview */
-          <div className="mx-auto mt-2 max-w-3xl rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mx-auto mt-2 max-w-3xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
             <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
             <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
             <hr className="my-5 border-slate-200" />

@@ -64,7 +64,7 @@ export default function DailyOps() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {groups.map((g) => {
           const Icon = g.icon
           return (
@@ -84,7 +84,7 @@ export default function DailyOps() {
                       <button
                         onClick={() => updateTask(t.id, { status: 'completed' }).catch(() => {})}
                         title="Mark complete"
-                        className="text-slate-300 hover:text-emerald-500"
+                        className="-m-1.5 shrink-0 rounded-full p-1.5 text-slate-300 hover:text-emerald-500"
                       >
                         <Circle size={18} />
                       </button>
