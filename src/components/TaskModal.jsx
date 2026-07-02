@@ -118,14 +118,14 @@ export default function TaskModal() {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8 ${
+      className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-900/60 p-0 backdrop-blur-sm sm:items-start sm:p-8 ${
         closing ? 'animate-fade-out' : 'animate-fade-in'
       }`}
     >
       <form
         onSubmit={handleSave}
-        className={`my-2 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 ${
-          closing ? 'animate-scale-out' : 'animate-scale-in'
+        className={`max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl ring-2 ring-slate-900/80 sm:my-2 sm:max-h-none sm:rounded-2xl ${
+          closing ? 'animate-sheet-down sm:animate-scale-out' : 'animate-sheet-up sm:animate-scale-in'
         }`}
       >
         {/* Header */}

@@ -131,8 +131,8 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
         {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
       </div>
 
-      {/* People list */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* People list — table (desktop) */}
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -163,6 +163,24 @@ function AdminBody({ members, me, loading, createMember, updateMember, removeMem
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* People list — cards (mobile / tablet) */}
+      <div className="space-y-2 lg:hidden">
+        {members.map((m) => (
+          <MobileMemberCard
+            key={m.id}
+            m={m}
+            isSelf={m.id === me?.id}
+            onUpdate={updateMember}
+            onRemove={removeMember}
+          />
+        ))}
+        {members.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+            No people yet. Add someone above.
+          </div>
+        )}
       </div>
 
       <p className="text-center text-xs text-slate-400">
@@ -299,6 +317,92 @@ function MemberRow({ m, isSelf, onUpdate, onRemove }) {
         )}
       </td>
     </tr>
+  )
+}
+
+function MobileMemberCard({ m, isSelf, onUpdate, onRemove }) {
+  const [name, setName] = useState(m.name)
+  useEffect(() => setName(m.name), [m.name])
+  const saveName = () => {
+    const v = name.trim()
+    if (!v) return setName(m.name)
+    if (v !== m.name) onUpdate(m.id, { name: v })
+  }
+  return (
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          className="min-w-0 flex-1 rounded border border-transparent px-1.5 py-1 text-sm font-semibold text-slate-800 hover:border-slate-200 focus:border-brand-400 focus:bg-white focus:outline-none"
+        />
+        {isSelf ? (
+          <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>
+        ) : (
+          <button
+            onClick={() => {
+              if (window.confirm(`Remove ${m.name}? They'll lose access.`)) onRemove(m.id)
+            }}
+            className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+            title="Remove"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Role</p>
+          {isSelf ? (
+            <p className="px-1 text-sm capitalize text-slate-500">{m.role}</p>
+          ) : (
+            <Select
+              size="sm"
+              value={m.role}
+              onChange={(v) => onUpdate(m.id, { role: v })}
+              options={[
+                { value: 'member', label: 'member' },
+                { value: 'admin', label: 'admin' },
+              ]}
+            />
+          )}
+        </div>
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Dept</p>
+          <Select
+            size="sm"
+            value={m.department || ''}
+            onChange={(v) => onUpdate(m.id, { department: v })}
+            options={DEPARTMENTS.map((d) => ({ value: d, label: d }))}
+          />
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Access code</p>
+        <CodeCell m={m} onUpdate={onUpdate} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onUpdate(m.id, { active: !m.active })}
+          disabled={isSelf}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-60 ${
+            m.active ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              m.active ? 'translate-x-4' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+        <span className="text-xs text-slate-500">{m.active ? 'Active' : 'Disabled'}</span>
+      </div>
+    </div>
   )
 }
 

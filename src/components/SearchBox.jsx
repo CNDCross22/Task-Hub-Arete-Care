@@ -4,7 +4,7 @@ import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { useAnimatedPresence } from '@/lib/useAnimatedPresence'
 
-export default function SearchBox() {
+export default function SearchBox({ mobile = false, autoFocus = false }) {
   const { tasks, openEditTask } = useData()
   const [q, setQ] = useState('')
   const [focused, setFocused] = useState(false)
@@ -31,16 +31,17 @@ export default function SearchBox() {
   const { render, closing } = useAnimatedPresence(showDropdown)
 
   return (
-    <div className="relative hidden sm:block">
+    <div className={`relative ${mobile ? '' : 'hidden sm:block'}`}>
       <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
       <input
         type="text"
+        autoFocus={autoFocus}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 120)}
         placeholder="Search tasks…"
-        className="w-64 rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+        className={`${mobile ? 'w-full' : 'w-64'} rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100`}
       />
 
       {render && (

@@ -39,6 +39,8 @@ export default {
           '0%': { transform: 'translateX(-120%)' },
           '100%': { transform: 'translateX(420%)' },
         },
+        'sheet-up': { from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } },
+        'sheet-down': { from: { transform: 'translateY(0)' }, to: { transform: 'translateY(100%)' } },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
@@ -47,6 +49,8 @@ export default {
         'scale-in': 'scale-in 0.18s ease-out',
         'scale-out': 'scale-out 0.16s ease-in forwards',
         'progress-slide': 'progress-slide 1.1s ease-in-out infinite',
+        'sheet-up': 'sheet-up 0.22s ease-out',
+        'sheet-down': 'sheet-down 0.18s ease-in forwards',
       },
     },
   },

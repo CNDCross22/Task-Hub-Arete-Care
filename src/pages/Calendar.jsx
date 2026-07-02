@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Plus, X, GripVertical } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
-import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate } from '@/lib/dates'
+import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate, medDate } from '@/lib/dates'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
+import ActionSheet from '@/components/ActionSheet'
+import { useIsDesktop } from '@/lib/useIsDesktop'
 
 const WEEKDAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayKey = () => toKey(new Date())
@@ -183,7 +185,17 @@ export default function Calendar() {
       return d
     })
 
+  const isDesktop = useIsDesktop()
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
+  if (!isDesktop)
+    return (
+      <MobileCalendar
+        tasks={tasks}
+        openNewTask={openNewTask}
+        openEditTask={openEditTask}
+        rescheduleTask={rescheduleTask}
+      />
+    )
 
   const title =
     mode === 'day'
@@ -532,5 +544,108 @@ function TaskChip({ t, onClick, showTime, ...dnd }) {
       {showTime && t.startTime && <span className="shrink-0 tabular-nums opacity-70">{fmtTime(t.startTime)}</span>}
       <span className="truncate">{t.title}</span>
     </button>
+  )
+}
+
+/* ---------- Mobile: one-day agenda + tap-to-move date ---------- */
+function MobileCalendar({ tasks, openNewTask, openEditTask, rescheduleTask }) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
+  const [moveTarget, setMoveTarget] = useState(null)
+  const dayKey = toKey(cursor)
+  const tKey = todayKey()
+  const items = tasks.filter((t) => t.dueDate === dayKey)
+  const shift = (n) =>
+    setCursor((c) => {
+      const d = new Date(c)
+      d.setDate(d.getDate() + n)
+      return d
+    })
+  const goToday = () => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    setCursor(d)
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-2 py-2">
+        <button onClick={goToday} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600">
+          Today
+        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => shift(-1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+            <ChevronLeft size={18} />
+          </button>
+          <span className={`min-w-[8.5rem] text-center text-sm font-semibold ${dayKey === tKey ? 'text-brand-700' : 'text-slate-800'}`}>
+            {WEEKDAYS[cursor.getDay()]}, {medDate(dayKey)}
+          </span>
+          <button onClick={() => shift(1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={() => openNewTask({ startDate: dayKey, dueDate: dayKey })}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500"
+      >
+        <Plus size={16} /> Add task
+      </button>
+
+      <div className="space-y-2">
+        {items.map((t) => {
+          const sm = statusMeta(t.status)
+          const pm = priorityMeta(t.priority)
+          const time = t.startTime ? `${fmtTime(t.startTime)}${t.endTime ? ` – ${fmtTime(t.endTime)}` : ''}` : 'All day'
+          return (
+            <div key={t.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <button onClick={() => openEditTask(t)} className="flex w-full items-start gap-2 text-left">
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${TONE[sm.tone].dot}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-slate-800">{t.title}</span>
+                  <span className="text-xs text-slate-400">
+                    {time}
+                    {t.company ? ` · ${t.company}` : ''}
+                  </span>
+                </span>
+                <Badge tone={pm.tone}>{pm.label}</Badge>
+              </button>
+              <div className="mt-2 flex items-center justify-between">
+                <Assignees ids={t.assignees} max={3} size={20} />
+                <button
+                  onClick={() => setMoveTarget(t)}
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600"
+                >
+                  Move date
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        {items.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+            No tasks due this day.
+          </div>
+        )}
+      </div>
+
+      <ActionSheet open={!!moveTarget} title="Move to date…" onClose={() => setMoveTarget(null)}>
+        <input
+          type="date"
+          defaultValue={moveTarget?.dueDate || dayKey}
+          onChange={(e) => {
+            if (e.target.value && moveTarget) {
+              rescheduleTask(moveTarget.id, e.target.value)
+              setMoveTarget(null)
+            }
+          }}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+        />
+      </ActionSheet>
+    </div>
   )
 }

@@ -1,13 +1,16 @@
 import { Fragment, useState } from 'react'
-import { Plus, Calendar as CalIcon } from 'lucide-react'
+import { Plus, Calendar as CalIcon, ArrowRightLeft } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, priorityMeta, TONE } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
+import ActionSheet from '@/components/ActionSheet'
 import { isOverdue, medDate } from '@/lib/dates'
+import { useIsDesktop } from '@/lib/useIsDesktop'
 
 export default function Kanban() {
-  const { tasks, reorderTask, openNewTask, openEditTask, loading } = useData()
+  const { tasks, reorderTask, moveTask, openNewTask, openEditTask, loading } = useData()
+  const isDesktop = useIsDesktop()
   const [dragId, setDragId] = useState(null)
   // Where the card would land: { colKey, beforeId } — beforeId null means end of column.
   const [drop, setDrop] = useState(null)
@@ -26,6 +29,10 @@ export default function Kanban() {
   }
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
+  if (!isDesktop)
+    return (
+      <MobileKanban tasks={tasks} openNewTask={openNewTask} openEditTask={openEditTask} moveTask={moveTask} />
+    )
 
   const Indicator = () => <div className="mx-1 my-1 h-1 rounded-full bg-brand-400" />
 
@@ -148,6 +155,110 @@ export default function Kanban() {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/* ---------- Mobile: status tabs + cards + tap-to-move ---------- */
+function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
+  const [status, setStatus] = useState(STATUSES[0].key)
+  const [moveTarget, setMoveTarget] = useState(null)
+  const colTasks = tasks.filter((t) => t.status === status)
+  const label = STATUSES.find((s) => s.key === status)?.label
+
+  return (
+    <div className="space-y-3">
+      {/* Status tabs */}
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
+        {STATUSES.map((s) => {
+          const count = tasks.filter((t) => t.status === s.key).length
+          const active = s.key === status
+          return (
+            <button
+              key={s.key}
+              onClick={() => setStatus(s.key)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                active ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${TONE[s.tone].dot}`} />
+              {s.label}
+              <span className={`rounded-full px-1.5 text-xs ${active ? 'bg-brand-100' : 'bg-slate-100'}`}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <button
+        onClick={() => openNewTask({ status })}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500"
+      >
+        <Plus size={16} /> Add to {label}
+      </button>
+
+      <div className="space-y-2">
+        {colTasks.map((t) => {
+          const pm = priorityMeta(t.priority)
+          const overdue = isOverdue(t)
+          return (
+            <div key={t.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <button onClick={() => openEditTask(t)} className="min-w-0 flex-1 text-left">
+                  <p className="text-sm font-medium text-slate-800">{t.title}</p>
+                </button>
+                <Badge tone={pm.tone}>{pm.label}</Badge>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  {t.dueDate && (
+                    <span className={`inline-flex items-center gap-1 ${overdue ? 'text-rose-600' : ''}`}>
+                      <CalIcon size={12} /> {medDate(t.dueDate)}
+                    </span>
+                  )}
+                  <Assignees ids={t.assignees} max={3} size={20} />
+                </div>
+                <button
+                  onClick={() => setMoveTarget(t)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600"
+                >
+                  <ArrowRightLeft size={13} /> Move
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        {colTasks.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">
+            No tasks in {label}.
+          </div>
+        )}
+      </div>
+
+      <ActionSheet open={!!moveTarget} title="Move to…" onClose={() => setMoveTarget(null)}>
+        <div className="space-y-1.5">
+          {STATUSES.map((s) => {
+            const current = moveTarget?.status === s.key
+            return (
+              <button
+                key={s.key}
+                disabled={current}
+                onClick={() => {
+                  moveTask(moveTarget.id, s.key)
+                  setMoveTarget(null)
+                  setStatus(s.key)
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-medium ${
+                  current ? 'border-slate-100 bg-slate-50 text-slate-400' : 'border-slate-200 text-slate-700'
+                }`}
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${TONE[s.tone].dot}`} />
+                {s.label}
+                {current && <span className="ml-auto text-xs">current</span>}
+              </button>
+            )
+          })}
+        </div>
+      </ActionSheet>
     </div>
   )
 }
