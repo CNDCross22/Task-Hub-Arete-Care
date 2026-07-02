@@ -3,11 +3,11 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import TaskModal from './TaskModal'
 import { navItems } from '@/navigation'
-import { useData } from '@/data/store'
+import { useBusy } from '@/data/store'
 
 export default function Layout({ children }) {
   const { pathname } = useLocation()
-  const { busy } = useData()
+  const busy = useBusy()
   const active =
     navItems.find((n) => (n.path === '/' ? pathname === '/' : pathname.startsWith(n.path))) ||
     navItems[0]

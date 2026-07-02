@@ -21,6 +21,11 @@ const backend = hasEdgeConfig
 export const BACKEND_MODE = hasEdgeConfig ? 'edge' : hasSupabaseConfig ? 'supabase' : 'local'
 
 const DataContext = createContext(null)
+// Ephemeral UI state that changes often (a save's busy flag flips on every
+// mutation; the modal opens/closes) lives in its own contexts so those updates
+// only re-render the few consumers that care — not every data reader.
+const BusyContext = createContext(false)
+const ModalContext = createContext(null)
 
 // Persist a batch of new tasks in one request when the backend supports it
 // (createMany), else fall back to individual creates.
@@ -458,7 +463,6 @@ export function DataProvider({ children }) {
       loading,
       loadError,
       reload,
-      busy: busyCount > 0,
       createTask,
       updateTask,
       removeTask,
@@ -474,7 +478,6 @@ export function DataProvider({ children }) {
       createMember,
       updateMember,
       removeMember,
-      modal,
       openNewTask,
       openEditTask,
       closeModal,
@@ -486,7 +489,6 @@ export function DataProvider({ children }) {
       loading,
       loadError,
       reload,
-      busyCount,
       createTask,
       updateTask,
       removeTask,
@@ -502,20 +504,36 @@ export function DataProvider({ children }) {
       createMember,
       updateMember,
       removeMember,
-      modal,
       openNewTask,
       openEditTask,
       closeModal,
     ],
   )
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+  return (
+    <DataContext.Provider value={value}>
+      <BusyContext.Provider value={busyCount > 0}>
+        <ModalContext.Provider value={modal}>{children}</ModalContext.Provider>
+      </BusyContext.Provider>
+    </DataContext.Provider>
+  )
 }
 
 export function useData() {
   const ctx = useContext(DataContext)
   if (!ctx) throw new Error('useData must be used within a DataProvider')
   return ctx
+}
+
+// The save-in-progress flag — read only by the global progress bar so a save
+// doesn't re-render every data consumer.
+export function useBusy() {
+  return useContext(BusyContext)
+}
+
+// The shared task-editor modal state — read only by the modal itself.
+export function useModal() {
+  return useContext(ModalContext)
 }
 
 export const projectMeta = (projects, id) => projects.find((p) => p.id === id) || null

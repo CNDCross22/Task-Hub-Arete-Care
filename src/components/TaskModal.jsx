@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronUp, Trash2, X, Plus, Loader2 } from 'lucide-react'
-import { useData } from '@/data/store'
+import { useData, useModal } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, RECURRENCES } from '@/data/config'
 import { shortName } from '@/lib/members'
 import { todayOnBoard } from '@/lib/dates'
@@ -27,8 +27,8 @@ const empty = {
 }
 
 export default function TaskModal() {
-  const { modal, closeModal, createTask, updateTask, removeTask, updateSeries, deleteSeries, members } =
-    useData()
+  const modal = useModal()
+  const { closeModal, createTask, updateTask, removeTask, updateSeries, deleteSeries, members } = useData()
   const [form, setForm] = useState(empty)
   const [closing, setClosing] = useState(false)
   const [scope, setScope] = useState(null) // { kind: 'save' | 'delete', payload? } for recurring series
