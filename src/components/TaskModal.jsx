@@ -259,7 +259,7 @@ export default function TaskModal() {
           </div>
 
           {/* Dates + Times */}
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
             <Field label="Start Date">
               <DatePicker value={form.startDate} onChange={(v) => set('startDate', v)} />
             </Field>
@@ -349,7 +349,7 @@ export default function TaskModal() {
 
       {scope && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-80 animate-scale-in rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-xs animate-scale-in rounded-2xl bg-white p-5 shadow-2xl">
             <h3 className="text-base font-semibold text-slate-900">
               {scope.kind === 'delete' ? 'Delete recurring task' : 'Save recurring task'}
             </h3>

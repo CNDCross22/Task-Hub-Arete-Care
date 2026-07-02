@@ -83,7 +83,7 @@ export default function Reports() {
     <div className="space-y-6">
       <WeeklyReport />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">Analytics across all tasks and companies</p>
         <button
           onClick={exportCsv}
@@ -95,9 +95,9 @@ export default function Reports() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {kpis.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONE[tone].soft}`}>
               <Icon size={20} />
             </span>
@@ -109,7 +109,7 @@ export default function Reports() {
 
       {/* AI Insights */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
               <Sparkles size={18} />
@@ -182,11 +182,11 @@ export default function Reports() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
                   {m.initials}
                 </span>
-                <span className="w-28 shrink-0 truncate text-sm text-slate-700">{m.label}</span>
+                <span className="w-20 shrink-0 truncate text-sm text-slate-700 sm:w-28">{m.label}</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-brand-500" style={{ width: `${(m.count / maxAssignee) * 100}%` }} />
                 </div>
-                <span className="w-16 shrink-0 text-right text-xs text-slate-400">{m.done}/{m.count} done</span>
+                <span className="w-14 shrink-0 text-right text-xs text-slate-400 sm:w-16">{m.done}/{m.count} done</span>
               </div>
             ))}
             {metrics.byAssignee.length === 0 && <p className="text-sm text-slate-400">No assigned tasks.</p>}
