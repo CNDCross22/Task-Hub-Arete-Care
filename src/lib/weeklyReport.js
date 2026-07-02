@@ -9,14 +9,20 @@ import { workWeekRange } from '@/lib/dates'
 
 const dayOf = (v) => (v ? String(v).slice(0, 10) : '')
 
-export function buildWeeklySnapshot(tasks, members = [], offsetWeeks = 0) {
+export function buildWeeklySnapshot(tasks, members = [], offsetWeeks = 0, memberId = null) {
   const { startKey, endKey } = workWeekRange(offsetWeeks)
   const inWeek = (v) => {
     const d = dayOf(v)
     return d && d >= startKey && d <= endKey
   }
 
-  const completed = tasks.filter((t) => t.status === 'completed' && inWeek(t.completedAt))
+  // memberId scopes the report to one person's completed (assigned) tasks.
+  const completed = tasks.filter(
+    (t) =>
+      t.status === 'completed' &&
+      inWeek(t.completedAt) &&
+      (!memberId || (t.assignees || []).includes(memberId)),
+  )
 
   // Group: department -> company -> [task summaries]
   const byDepartment = {}
@@ -42,8 +48,11 @@ export function buildWeeklySnapshot(tasks, members = [], offsetWeeks = 0) {
   }
 }
 
-export async function generateWeeklyReport(tasks, { offsetWeeks = 0, members = [], ...opts } = {}) {
-  const snapshot = buildWeeklySnapshot(tasks, members, offsetWeeks)
+export async function generateWeeklyReport(
+  tasks,
+  { offsetWeeks = 0, members = [], memberId = null, subject = null, ...opts } = {},
+) {
+  const snapshot = buildWeeklySnapshot(tasks, members, offsetWeeks, memberId)
 
   // No completed work this week — signal an empty state to the UI instead of
   // asking the AI to summarize an empty list (which produces an awkward
@@ -52,9 +61,13 @@ export async function generateWeeklyReport(tasks, { offsetWeeks = 0, members = [
     return { text: '', empty: true, range: snapshot.range, snapshot }
   }
 
-  const prompt = `You are an operations associate compiling the team's WEEKLY REPORT covering IT and Marketing work across several companies.
+  const intro = subject
+    ? `You are compiling ${subject}'s INDIVIDUAL weekly report — a summary of the tasks ${subject} personally completed this week, across IT and Marketing for several companies.`
+    : `You are an operations associate compiling the team's WEEKLY REPORT covering IT and Marketing work across several companies.`
 
-Here is every task COMPLETED during the reporting week, already grouped by department and company (JSON):
+  const prompt = `${intro}
+
+Here is every task COMPLETED during the reporting week${subject ? ` by ${subject}` : ''}, already grouped by department and company (JSON):
 ${JSON.stringify(snapshot.byDepartment, null, 2)}
 
 Write ONLY the markdown body of the report, using EXACTLY this hierarchy and nothing else:

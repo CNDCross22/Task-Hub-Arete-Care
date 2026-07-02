@@ -6,14 +6,24 @@ import { isAIConfigured } from '@/lib/gemini'
 import { parseBlocks, downloadDocx, downloadPdf } from '@/lib/exporters'
 import { longDate, workWeekRange } from '@/lib/dates'
 import Markdownish from '@/components/Markdownish'
+import Select from '@/components/Select'
 
 const TITLE = 'IT & Marketing Weekly Report'
 
 export default function WeeklyReport() {
   const { tasks, members } = useData()
   const [week, setWeek] = useState(0) // 0 = this week, -1 = last week
+  const [who, setWho] = useState('all') // 'all' (general) or a member id
   const [state, setState] = useState({ text: '', empty: false, loading: false, error: '', range: null })
   const [exporting, setExporting] = useState('')
+
+  const subject = who === 'all' ? null : members.find((m) => m.id === who)
+  const title = subject ? `Weekly Report — ${subject.name}` : TITLE
+  const whoOptions = [
+    { value: 'all', label: 'General (whole team)' },
+    ...members.filter((m) => m.active !== false).map((m) => ({ value: m.id, label: m.name })),
+  ]
+  const resetReport = () => setState({ text: '', empty: false, loading: false, error: '', range: null })
 
   const preview = workWeekRange(week)
   const activeRange = state.range || preview
@@ -24,7 +34,12 @@ export default function WeeklyReport() {
   const generate = async () => {
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const { text, range, empty } = await generateWeeklyReport(tasks, { offsetWeeks: week, members })
+      const { text, range, empty } = await generateWeeklyReport(tasks, {
+        offsetWeeks: week,
+        members,
+        memberId: who === 'all' ? null : who,
+        subject: subject?.name || null,
+      })
       setState({ text, empty: !!empty, loading: false, error: '', range })
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e.message || 'Something went wrong.' }))
@@ -37,7 +52,8 @@ export default function WeeklyReport() {
     try {
       const blocks = parseBlocks(state.text)
       const stamp = new Date().toISOString().slice(0, 10)
-      const payload = { title: TITLE, subtitle, blocks, filename: `weekly-report-${stamp}.${kind}` }
+      const slug = subject ? subject.name.toLowerCase().replace(/\s+/g, '-') : 'team'
+      const payload = { title, subtitle, blocks, filename: `weekly-report-${slug}-${stamp}.${kind}` }
       if (kind === 'docx') await downloadDocx(payload)
       else await downloadPdf(payload)
     } catch (e) {
@@ -60,7 +76,18 @@ export default function WeeklyReport() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-44">
+            <Select
+              value={who}
+              onChange={(v) => {
+                setWho(v)
+                resetReport()
+              }}
+              options={whoOptions}
+              size="sm"
+            />
+          </div>
           <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
             {[
               { v: 0, l: 'This Week' },
@@ -71,7 +98,7 @@ export default function WeeklyReport() {
                 onClick={() => {
                   if (week !== o.v) {
                     setWeek(o.v)
-                    setState({ text: '', empty: false, loading: false, error: '', range: null })
+                    resetReport()
                   }
                 }}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -133,7 +160,7 @@ export default function WeeklyReport() {
         {state.loading && (
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Loader2 size={16} className="animate-spin" />
-            Writing this week's report from {tasks.length} tasks…
+            Writing {subject ? `${subject.name}'s` : "this week's"} report…
           </div>
         )}
 
@@ -142,7 +169,9 @@ export default function WeeklyReport() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
               <CalendarX2 size={24} />
             </div>
-            <h4 className="mt-4 text-base font-semibold text-slate-700">No completed work this week</h4>
+            <h4 className="mt-4 text-base font-semibold text-slate-700">
+              No completed work {subject ? `for ${subject.name} ` : ''}this week
+            </h4>
             <p className="mt-1 max-w-md text-sm text-slate-500">
               Nothing was marked complete for{' '}
               <span className="font-medium text-slate-600">
@@ -157,7 +186,7 @@ export default function WeeklyReport() {
         {state.text && !state.loading && (
           /* Document-style preview */
           <div className="mx-auto mt-2 max-w-3xl rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-900">{TITLE}</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
             <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
             <hr className="my-5 border-slate-200" />
             <Markdownish text={state.text} />
