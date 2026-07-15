@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createLocalBackend } from './backend/localBackend'
 import { createSupabaseBackend } from './backend/supabaseBackend'
 import { createEdgeBackend, hasEdgeConfig } from './backend/edgeBackend'
@@ -9,16 +9,69 @@ import { uid, nowIso } from '@/lib/id'
 import { buildSeries, completionStamp, SERIES_SKIP } from '@/data/recurrence'
 import { useToast } from '@/components/Toast'
 
+// How often to re-fetch so other people's edits appear without a reload. The
+// database is locked behind the Edge Function (RLS denies direct access), so
+// Supabase's websocket realtime isn't available to the browser without handing
+// out read access to the public anon key — we poll instead. Only while the tab
+// is visible, and never on top of an unsaved optimistic change.
+const POLL_MS = 10000
+
+// Number of writes currently in flight. The live-sync poll checks this so a
+// server snapshot taken before a pending save can't clobber the optimistic UI.
+let pendingWrites = 0
+
+// Wrap every mutating method so `pendingWrites` covers all of them — including
+// reorder/reschedule, which intentionally skip the global busy flag.
+function trackWrites(b) {
+  const wrap = (fn) => async (...args) => {
+    pendingWrites++
+    try {
+      return await fn(...args)
+    } finally {
+      pendingWrites--
+    }
+  }
+  return {
+    ...b,
+    create: wrap(b.create.bind(b)),
+    update: wrap(b.update.bind(b)),
+    remove: wrap(b.remove.bind(b)),
+    replace: wrap(b.replace.bind(b)),
+    ...(b.createMany ? { createMany: wrap(b.createMany.bind(b)) } : {}),
+  }
+}
+
 // Backend priority:
 //   edge     — secure Edge Function proxy (RLS on; service key server-side)
 //   supabase — direct table access via publishable key (RLS off; dev only)
 //   local    — browser localStorage (no backend configured)
-const backend = hasEdgeConfig
-  ? createEdgeBackend()
-  : hasSupabaseConfig
-    ? createSupabaseBackend()
-    : createLocalBackend(seedData)
+const backend = trackWrites(
+  hasEdgeConfig
+    ? createEdgeBackend()
+    : hasSupabaseConfig
+      ? createSupabaseBackend()
+      : createLocalBackend(seedData),
+)
 export const BACKEND_MODE = hasEdgeConfig ? 'edge' : hasSupabaseConfig ? 'supabase' : 'local'
+
+// Backfill fields on rows written before completedAt / seriesId existed, so an
+// old task still collapses as a series and reports its completion date.
+function migrateTasks(raw) {
+  let changed = false
+  const tasks = raw.map((t) => {
+    let next = t
+    if (next.status === 'completed' && !next.completedAt) {
+      next = { ...next, completedAt: next.dueDate || next.createdAt }
+      changed = true
+    }
+    if (next.recurring && !next.seriesId) {
+      next = { ...next, seriesId: uid('s') }
+      changed = true
+    }
+    return next
+  })
+  return { tasks, changed }
+}
 
 const DataContext = createContext(null)
 // Ephemeral UI state that changes often (a save's busy flag flips on every
@@ -70,6 +123,10 @@ export function DataProvider({ children }) {
     [toast],
   )
 
+  // Serialized copy of the last server payload we applied, so a poll that finds
+  // nothing new skips setState entirely (no re-render, no flicker).
+  const snapshotRef = useRef('')
+
   useEffect(() => {
     let active = true
     setLoading(true)
@@ -78,23 +135,9 @@ export function DataProvider({ children }) {
       .getAll()
       .then((db) => {
         if (!active) return
-        // One-time migrations: backfill completedAt for old completed tasks, and
-        // a seriesId for any recurring task created before series linking existed
-        // (so it collapses to a series row and offers the this/all-occurrence edit).
-        const raw = db.tasks || []
-        let changed = false
-        const migrated = raw.map((t) => {
-          let next = t
-          if (next.status === 'completed' && !next.completedAt) {
-            next = { ...next, completedAt: next.dueDate || next.createdAt }
-            changed = true
-          }
-          if (next.recurring && !next.seriesId) {
-            next = { ...next, seriesId: uid('s') }
-            changed = true
-          }
-          return next
-        })
+        // One-time migrations, written back so later loads are already clean.
+        const { tasks: migrated, changed } = migrateTasks(db.tasks || [])
+        snapshotRef.current = JSON.stringify(db)
         setProjects(db.projects || [])
         setTasks(migrated)
         setMembers(db.members || [])
@@ -111,6 +154,44 @@ export function DataProvider({ children }) {
       active = false
     }
   }, [reloadKey])
+
+  // Live sync — keeps the board current without a reload: poll while the tab is
+  // visible, and refresh immediately when it regains focus.
+  useEffect(() => {
+    if (BACKEND_MODE === 'local' || loading || loadError) return
+    let cancelled = false
+
+    const sync = async () => {
+      // Don't fetch in a background tab, and never race a save that's in flight.
+      if (document.hidden || pendingWrites > 0) return
+      try {
+        const db = await backend.getAll()
+        // A write started while we were fetching — this snapshot predates it.
+        if (cancelled || pendingWrites > 0) return
+        const sig = JSON.stringify(db)
+        if (sig === snapshotRef.current) return
+        snapshotRef.current = sig
+        setProjects(db.projects || [])
+        setTasks(migrateTasks(db.tasks || []).tasks)
+        setMembers(db.members || [])
+      } catch {
+        // Keep the last good data on screen; the next tick retries.
+      }
+    }
+
+    const id = setInterval(sync, POLL_MS)
+    const onWake = () => {
+      if (!document.hidden) sync()
+    }
+    window.addEventListener('focus', onWake)
+    document.addEventListener('visibilitychange', onWake)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      window.removeEventListener('focus', onWake)
+      document.removeEventListener('visibilitychange', onWake)
+    }
+  }, [loading, loadError])
 
   // Optimistic: the UI updates immediately and the save runs in the background,
   // rolling back with an error toast if it fails. Makes add/edit feel instant
