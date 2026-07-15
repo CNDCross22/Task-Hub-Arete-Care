@@ -6,7 +6,7 @@
 //   - navigations  -> network-first, fall back to the cached app shell offline
 //   - same-origin GET assets (content-hashed by Vite) -> stale-while-revalidate
 // Bump VERSION to force a clean cache on the next visit.
-const VERSION = 'v1'
+const VERSION = 'v2'
 const CACHE = `arete-hub-${VERSION}`
 // scope is the deploy sub-path, e.g. "/Task-Hub-Arete-Care/" (or "/" in dev).
 const BASE = new URL(self.registration.scope).pathname
@@ -36,11 +36,13 @@ self.addEventListener('fetch', (event) => {
   // Never touch cross-origin traffic (API/auth/fonts) — let the network handle it.
   if (url.origin !== self.location.origin) return
 
-  // App navigations: prefer the network so new deploys show up; cache the shell
-  // as we go and serve it when offline.
+  // App navigations: always go to the network, bypassing the HTTP cache. GitHub
+  // Pages serves index.html with max-age=600, so without `no-store` a client can
+  // keep booting a 10-minute-old shell (and therefore an old JS bundle) after a
+  // deploy. Cache the shell as we go and fall back to it only when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((res) => {
           const copy = res.clone()
           caches.open(CACHE).then((c) => c.put(BASE, copy)).catch(() => {})
@@ -51,19 +53,23 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static assets: serve from cache immediately, refresh in the background.
+  // Static assets (content-hashed): serve from cache, refresh in the background.
   event.respondWith(
     caches.match(request).then((cached) => {
-      const fromNetwork = fetch(request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {})
-          }
-          return res
-        })
-        .catch(() => cached)
-      return cached || fromNetwork
+      const network = fetch(request).then((res) => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copy = res.clone()
+          caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {})
+        }
+        return res
+      })
+      if (cached) {
+        network.catch(() => {}) // background refresh; a failure just keeps the cached copy
+        return cached
+      }
+      // Nothing cached: let the network result (or its error) through as-is,
+      // rather than resolving to undefined, which surfaces as "Failed to fetch".
+      return network
     }),
   )
 })

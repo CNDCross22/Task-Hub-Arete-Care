@@ -14,7 +14,7 @@ import { useToast } from '@/components/Toast'
 // Supabase's websocket realtime isn't available to the browser without handing
 // out read access to the public anon key — we poll instead. Only while the tab
 // is visible, and never on top of an unsaved optimistic change.
-const POLL_MS = 10000
+const POLL_MS = 4000
 
 // Number of writes currently in flight. The live-sync poll checks this so a
 // server snapshot taken before a pending save can't clobber the optimistic UI.
