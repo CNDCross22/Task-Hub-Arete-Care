@@ -8,6 +8,7 @@ import Pagination from '@/components/Pagination'
 import Select from '@/components/Select'
 import OrderArrows from '@/components/OrderArrows'
 import { isOverdue, medDate } from '@/lib/dates'
+import { byManualOrder } from '@/lib/order'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
@@ -57,20 +58,11 @@ export default function Tasks() {
   // with a count, so pre-generated occurrences don't flood the list.
   const collapsed = useMemo(() => collapseSeries(filtered), [filtered])
 
-  // Group by status — Pending on top, Completed at the bottom — and keep the
-  // manual order (sortIndex) inside each group. Completing a task drops it to
-  // the bottom on its own; unnumbered tasks fall to the end of their group,
-  // newest first.
+  // Group by status — Pending on top, Completed at the bottom — keeping the
+  // manual arrangement inside each group. Completing a task drops it to the
+  // bottom on its own.
   const ordered = useMemo(
-    () =>
-      [...collapsed].sort((a, b) => {
-        const rank = statusRank(a.status) - statusRank(b.status)
-        if (rank) return rank
-        const ai = typeof a.sortIndex === 'number' ? a.sortIndex : Number.MAX_SAFE_INTEGER
-        const bi = typeof b.sortIndex === 'number' ? b.sortIndex : Number.MAX_SAFE_INTEGER
-        if (ai !== bi) return ai - bi
-        return (b.createdAt || '').localeCompare(a.createdAt || '')
-      }),
+    () => [...collapsed].sort((a, b) => statusRank(a.status) - statusRank(b.status) || byManualOrder(a, b)),
     [collapsed],
   )
 

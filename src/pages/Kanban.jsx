@@ -6,6 +6,7 @@ import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import ActionSheet from '@/components/ActionSheet'
 import { isOverdue, medDate } from '@/lib/dates'
+import { byManualOrder } from '@/lib/order'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 
 export default function Kanban() {
@@ -39,7 +40,7 @@ export default function Kanban() {
   return (
     <div className="flex h-full gap-4 overflow-x-auto pb-2">
       {STATUSES.map((col) => {
-        const colTasks = tasks.filter((t) => t.status === col.key)
+        const colTasks = tasks.filter((t) => t.status === col.key).sort(byManualOrder)
         const isOver = drop?.colKey === col.key
         return (
           <div
@@ -163,7 +164,7 @@ export default function Kanban() {
 function MobileKanban({ tasks, openNewTask, openEditTask, moveTask }) {
   const [status, setStatus] = useState(STATUSES[0].key)
   const [moveTarget, setMoveTarget] = useState(null)
-  const colTasks = tasks.filter((t) => t.status === status)
+  const colTasks = tasks.filter((t) => t.status === status).sort(byManualOrder)
   const label = STATUSES.find((s) => s.key === status)?.label
 
   return (

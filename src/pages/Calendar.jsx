@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate, medDate } from '@/lib/dates'
+import { byManualOrder } from '@/lib/order'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import ActionSheet from '@/components/ActionSheet'
@@ -157,12 +158,13 @@ export default function Calendar() {
 
   const tasksByDay = useMemo(() => {
     const map = {}
-    // Keep each day in the tasks' own order (manual arrangement / sortIndex), so
-    // reordering within a day is reflected and persists.
     for (const t of tasks) {
       if (!t.dueDate) continue
       ;(map[t.dueDate] ||= []).push(t)
     }
+    // Sort each day by the manual arrangement rather than trusting the array's
+    // order, so reordering shows up immediately instead of only after a refetch.
+    for (const key of Object.keys(map)) map[key].sort(byManualOrder)
     return map
   }, [tasks])
 
