@@ -7,26 +7,33 @@ import { seedData } from './seed'
 import { TASK_DEFAULTS } from './config'
 import { uid, nowIso } from '@/lib/id'
 import { buildSeries, completionStamp, SERIES_SKIP } from '@/data/recurrence'
+import { notifyChange, subscribeToChanges } from './realtime'
 import { useToast } from '@/components/Toast'
 
-// How often to re-fetch so other people's edits appear without a reload. The
-// database is locked behind the Edge Function (RLS denies direct access), so
-// Supabase's websocket realtime isn't available to the browser without handing
-// out read access to the public anon key — we poll instead. Only while the tab
-// is visible, and never on top of an unsaved optimistic change.
-const POLL_MS = 4000
+// Updates arrive instantly by push (see ./realtime): whoever changes something
+// broadcasts a ping and everyone else refetches. This poll is only a safety net
+// for when the websocket is blocked (some corporate networks) or a ping goes
+// missing, so it's slow — push is the path that makes the app feel live.
+const POLL_MS = 15000
+
+// At most one refetch per this window, so a burst of pings (or a spoofed one —
+// the channel is reachable with the public key) can't spam the Edge Function.
+const SYNC_THROTTLE_MS = 700
 
 // Number of writes currently in flight. The live-sync poll checks this so a
 // server snapshot taken before a pending save can't clobber the optimistic UI.
 let pendingWrites = 0
 
 // Wrap every mutating method so `pendingWrites` covers all of them — including
-// reorder/reschedule, which intentionally skip the global busy flag.
+// reorder/reschedule, which intentionally skip the global busy flag — and so a
+// "changed" ping goes out after any successful write, whatever the code path.
 function trackWrites(b) {
   const wrap = (fn) => async (...args) => {
     pendingWrites++
     try {
-      return await fn(...args)
+      const result = await fn(...args)
+      notifyChange()
+      return result
     } finally {
       pendingWrites--
     }
@@ -155,43 +162,70 @@ export function DataProvider({ children }) {
     }
   }, [reloadKey])
 
-  // Live sync — keeps the board current without a reload: poll while the tab is
-  // visible, and refresh immediately when it regains focus.
+  // Pull the latest server state. Cheap when nothing changed: the payload is
+  // compared against the last one applied, so an unchanged poll skips setState
+  // entirely (no re-render, no flicker).
+  const syncNow = useCallback(async () => {
+    // Don't fetch in a background tab, and never race a save that's in flight.
+    if (document.hidden || pendingWrites > 0) return
+    try {
+      const db = await backend.getAll()
+      // A write started while we were fetching — this snapshot predates it.
+      if (pendingWrites > 0) return
+      const sig = JSON.stringify(db)
+      if (sig === snapshotRef.current) return
+      snapshotRef.current = sig
+      setProjects(db.projects || [])
+      setTasks(migrateTasks(db.tasks || []).tasks)
+      setMembers(db.members || [])
+    } catch {
+      // Keep the last good data on screen; the next ping/tick retries.
+    }
+  }, [])
+
+  // Throttled entry point for pushed pings: runs immediately when idle, else
+  // schedules one trailing refetch, so N rapid pings cost at most one fetch per
+  // window and we still end on the newest state.
+  const lastSyncRef = useRef(0)
+  const queuedRef = useRef(false)
+  const scheduleSync = useCallback(() => {
+    const wait = SYNC_THROTTLE_MS - (Date.now() - lastSyncRef.current)
+    if (wait <= 0) {
+      lastSyncRef.current = Date.now()
+      syncNow()
+      return
+    }
+    if (queuedRef.current) return
+    queuedRef.current = true
+    setTimeout(() => {
+      queuedRef.current = false
+      lastSyncRef.current = Date.now()
+      syncNow()
+    }, wait)
+  }, [syncNow])
+
+  // Instant updates: refetch the moment another client reports a change.
   useEffect(() => {
     if (BACKEND_MODE === 'local' || loading || loadError) return
-    let cancelled = false
+    return subscribeToChanges(scheduleSync)
+  }, [loading, loadError, scheduleSync])
 
-    const sync = async () => {
-      // Don't fetch in a background tab, and never race a save that's in flight.
-      if (document.hidden || pendingWrites > 0) return
-      try {
-        const db = await backend.getAll()
-        // A write started while we were fetching — this snapshot predates it.
-        if (cancelled || pendingWrites > 0) return
-        const sig = JSON.stringify(db)
-        if (sig === snapshotRef.current) return
-        snapshotRef.current = sig
-        setProjects(db.projects || [])
-        setTasks(migrateTasks(db.tasks || []).tasks)
-        setMembers(db.members || [])
-      } catch {
-        // Keep the last good data on screen; the next tick retries.
-      }
-    }
-
-    const id = setInterval(sync, POLL_MS)
+  // Safety net for a dropped websocket or a missed ping, plus an immediate
+  // catch-up whenever the tab/app comes back to the foreground.
+  useEffect(() => {
+    if (BACKEND_MODE === 'local' || loading || loadError) return
+    const id = setInterval(syncNow, POLL_MS)
     const onWake = () => {
-      if (!document.hidden) sync()
+      if (!document.hidden) syncNow()
     }
     window.addEventListener('focus', onWake)
     document.addEventListener('visibilitychange', onWake)
     return () => {
-      cancelled = true
       clearInterval(id)
       window.removeEventListener('focus', onWake)
       document.removeEventListener('visibilitychange', onWake)
     }
-  }, [loading, loadError])
+  }, [loading, loadError, syncNow])
 
   // Optimistic: the UI updates immediately and the save runs in the background,
   // rolling back with an error toast if it fails. Makes add/edit feel instant
