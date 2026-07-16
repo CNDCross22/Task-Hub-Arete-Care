@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Calendar as CalIcon, Repeat, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, Calendar as CalIcon, Repeat, SlidersHorizontal } from 'lucide-react'
 import { useData } from '@/data/store'
 import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta, statusRank } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
 import Select from '@/components/Select'
+import OrderArrows from '@/components/OrderArrows'
 import { isOverdue, medDate } from '@/lib/dates'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
-  const { tasks, openNewTask, openEditTask, moveInStatus, loading } = useData()
+  const { tasks, openNewTask, openEditTask, moveWithin, loading } = useData()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
@@ -88,7 +89,7 @@ export default function Tasks() {
   // Reorder against the whole filtered group, not just this page, so moving a
   // row off the top of a page lands it on the previous one.
   const nudge = (t, dir) =>
-    moveInStatus(
+    moveWithin(
       t.id,
       dir,
       ordered.filter((x) => x.status === t.status).map((x) => x.id),
@@ -297,28 +298,6 @@ export default function Tasks() {
         )}
       </div>
     </div>
-  )
-}
-
-// Reordering without drag-and-drop: nudge a task up or down within its own
-// status group. Stops propagation so it doesn't open the task editor.
-function OrderArrows({ canUp, canDown, onUp, onDown, compact = false }) {
-  const cls = `rounded ${
-    compact ? 'p-0.5' : 'p-1.5'
-  } text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-400`
-  const press = (fn) => (e) => {
-    e.stopPropagation()
-    fn()
-  }
-  return (
-    <span className="flex shrink-0 flex-col leading-none">
-      <button type="button" onClick={press(onUp)} disabled={!canUp} className={cls} title="Move up">
-        <ChevronUp size={compact ? 13 : 16} />
-      </button>
-      <button type="button" onClick={press(onDown)} disabled={!canDown} className={cls} title="Move down">
-        <ChevronDown size={compact ? 13 : 16} />
-      </button>
-    </span>
   )
 }
 

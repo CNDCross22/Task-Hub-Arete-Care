@@ -1,12 +1,13 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, Plus, X, GripVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useData } from '@/data/store'
 import { statusMeta, priorityMeta, TONE } from '@/data/config'
 import { toKey, MONTHS, WEEKDAYS, prettyDate, longDate, medDate } from '@/lib/dates'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import ActionSheet from '@/components/ActionSheet'
+import OrderArrows from '@/components/OrderArrows'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 
 const WEEKDAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -136,7 +137,7 @@ function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onChipDr
 }
 
 export default function Calendar() {
-  const { tasks, openNewTask, openEditTask, rescheduleTask, reorderTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, rescheduleTask, reorderTask, moveWithin, loading } = useData()
 
   // Drop a task onto another task: reposition it before that task. If they're on
   // different days it also moves to that day; same day = pure reorder.
@@ -157,7 +158,7 @@ export default function Calendar() {
   const tasksByDay = useMemo(() => {
     const map = {}
     // Keep each day in the tasks' own order (manual arrangement / sortIndex), so
-    // drag-to-reorder within a day is reflected and persists.
+    // reordering within a day is reflected and persists.
     for (const t of tasks) {
       if (!t.dueDate) continue
       ;(map[t.dueDate] ||= []).push(t)
@@ -250,7 +251,7 @@ export default function Calendar() {
           tasksByDay={tasksByDay}
           openNewTask={openNewTask}
           openEditTask={openEditTask}
-          onChipDrop={onChipDrop}
+          moveWithin={moveWithin}
         />
       )}
       {mode === 'week' && (
@@ -284,9 +285,10 @@ function weekTitle(cursor) {
 }
 
 /* ---------- Day ---------- */
-function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, onChipDrop }) {
+function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, moveWithin }) {
   const items = tasksByDay[dayKey] || []
-  const [overId, setOverId] = useState(null)
+  // Reorder within the day using arrows rather than dragging rows around.
+  const nudge = (t, dir) => moveWithin(t.id, dir, items.map((x) => x.id))
   return (
     <div className="flex-1 overflow-y-auto p-4">
       <div className="mx-auto max-w-2xl">
@@ -302,28 +304,15 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, onChipDrop }) 
           </button>
         </div>
         <div className="space-y-2">
-          {items.map((t) => (
+          {items.map((t, i) => (
             <AgendaRow
               key={t.id}
               t={t}
               onClick={() => openEditTask(t)}
-              dragOver={overId === t.id}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(DRAG_MIME, t.id)
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-              onDragEnd={() => setOverId(null)}
-              onDragOver={(e) => {
-                e.preventDefault()
-                if (overId !== t.id) setOverId(t.id)
-              }}
-              onDrop={(e) => {
-                e.preventDefault()
-                const id = e.dataTransfer.getData(DRAG_MIME)
-                setOverId(null)
-                if (id && id !== t.id) onChipDrop?.(id, t)
-              }}
+              canUp={i > 0}
+              canDown={i < items.length - 1}
+              onUp={() => nudge(t, -1)}
+              onDown={() => nudge(t, 1)}
             />
           ))}
           {items.length === 0 && (
@@ -337,31 +326,29 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, onChipDrop }) 
   )
 }
 
-function AgendaRow({ t, onClick, dragOver, ...dnd }) {
+function AgendaRow({ t, onClick, canUp, canDown, onUp, onDown }) {
   const sm = statusMeta(t.status)
   const pm = priorityMeta(t.priority)
   const time = t.startTime ? `${fmtTime(t.startTime)}${t.endTime ? ` – ${fmtTime(t.endTime)}` : ''}` : 'All day'
   return (
-    <button
-      onClick={onClick}
-      {...dnd}
-      className={`flex w-full items-center gap-3 rounded-lg border bg-white p-3 text-left hover:bg-slate-50 ${
-        dragOver ? 'border-brand-400 ring-1 ring-inset ring-brand-300' : 'border-slate-200'
-      } ${dnd.draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
-    >
-      <GripVertical size={14} className="shrink-0 text-slate-300" />
-      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE[sm.tone].dot}`} />
-      <div className="w-28 shrink-0 text-xs text-slate-500">{time}</div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-slate-800">{t.title}</div>
-        <div className="truncate text-xs text-slate-400">
-          {t.department}
-          {t.company ? ` · ${t.company}` : ''}
-        </div>
-      </div>
-      <Badge tone={pm.tone}>{pm.label}</Badge>
-      <Assignees ids={t.assignees} max={3} size={22} />
-    </button>
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
+      <OrderArrows compact canUp={canUp} canDown={canDown} onUp={onUp} onDown={onDown} />
+      {/* The row body is the tap target; the arrows sit outside it (a button
+          can't be nested inside another button). */}
+      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE[sm.tone].dot}`} />
+        <span className="w-28 shrink-0 text-xs text-slate-500">{time}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-slate-800">{t.title}</span>
+          <span className="block truncate text-xs text-slate-400">
+            {t.department}
+            {t.company ? ` · ${t.company}` : ''}
+          </span>
+        </span>
+        <Badge tone={pm.tone}>{pm.label}</Badge>
+        <Assignees ids={t.assignees} max={3} size={22} />
+      </button>
+    </div>
   )
 }
 

@@ -411,7 +411,7 @@ export function DataProvider({ children }) {
   // Fast path: slot a fractional sortIndex between the new neighbours and write
   // that one row. Fallback (a neighbour is unnumbered, or the gap is used up):
   // renumber the group by position, writing only the rows that actually moved.
-  const moveInStatus = useCallback(
+  const moveWithin = useCallback(
     (id, dir, groupIds) => {
       const i = groupIds.indexOf(id)
       const j = i + dir
@@ -667,7 +667,7 @@ export function DataProvider({ children }) {
       updateSeries,
       deleteSeries,
       moveTask,
-      moveInStatus,
+      moveWithin,
       reorderTask,
       rescheduleTask,
       createProject,
@@ -694,7 +694,7 @@ export function DataProvider({ children }) {
       updateSeries,
       deleteSeries,
       moveTask,
-      moveInStatus,
+      moveWithin,
       reorderTask,
       rescheduleTask,
       createProject,
