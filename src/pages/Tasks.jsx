@@ -9,10 +9,12 @@ import Select from '@/components/Select'
 import OrderArrows from '@/components/OrderArrows'
 import { isOverdue, medDate } from '@/lib/dates'
 import { byManualOrder } from '@/lib/order'
+import { mergeVisibleIntoGroup } from '@/lib/reorder'
+import { useReorder } from '@/lib/useReorder'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
-  const { tasks, openNewTask, openEditTask, moveWithin, loading } = useData()
+  const { tasks, openNewTask, openEditTask, moveWithin, commitOrder, loading } = useData()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
@@ -92,6 +94,18 @@ export default function Tasks() {
     () => ordered.slice((page - 1) * pageSize, page * pageSize),
     [ordered, page, pageSize],
   )
+
+  // Drag-to-reorder (alongside the arrows). Restricted to within a status group;
+  // the dropped order of the visible page is folded back into the full group so
+  // sortIndex neighbours at page boundaries stay correct.
+  const tById = useMemo(() => new Map(paged.map((t) => [t.id, t])), [paged])
+  const dragCommit = (newVisibleIds, movedId) => {
+    const st = tById.get(movedId)?.status
+    const fullGroup = ordered.filter((t) => t.status === st).map((t) => t.id)
+    const newVisible = newVisibleIds.filter((id) => tById.get(id)?.status === st)
+    commitOrder(movedId, mergeVisibleIntoGroup(fullGroup, newVisible))
+  }
+  const sort = useReorder(paged.map((t) => t.id), dragCommit, (id) => tById.get(id)?.status)
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
 
@@ -179,15 +193,20 @@ export default function Tasks() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {paged.map((t) => {
+            {sort.order.map((id) => {
+              const t = tById.get(id)
+              if (!t) return null
               const sm = statusMeta(t.status)
               const pm = priorityMeta(t.priority)
               const overdue = isOverdue(t)
               return (
                 <tr
                   key={t.id}
+                  {...sort.dragProps(t.id)}
                   onClick={() => openEditTask(t)}
-                  className="cursor-pointer transition-colors hover:bg-slate-50"
+                  className={`cursor-pointer select-none transition-colors hover:bg-slate-50 ${
+                    sort.dragId === t.id ? 'opacity-40' : ''
+                  }`}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -259,17 +278,23 @@ export default function Tasks() {
       {/* Cards (mobile / tablet) — two columns once there's tablet width */}
       <div className="space-y-2 lg:hidden">
         <div className="grid gap-2 sm:grid-cols-2">
-          {paged.map((t) => (
-            <TaskCard
-              key={t.id}
-              t={t}
-              onClick={() => openEditTask(t)}
-              canUp={slot.pos[t.id] > 0}
-              canDown={slot.pos[t.id] < slot.size[t.status] - 1}
-              onUp={() => nudge(t, -1)}
-              onDown={() => nudge(t, 1)}
-            />
-          ))}
+          {sort.order.map((id) => {
+            const t = tById.get(id)
+            if (!t) return null
+            return (
+              <TaskCard
+                key={t.id}
+                t={t}
+                onClick={() => openEditTask(t)}
+                dragProps={sort.dragProps(t.id)}
+                dragging={sort.dragId === t.id}
+                canUp={slot.pos[t.id] > 0}
+                canDown={slot.pos[t.id] < slot.size[t.status] - 1}
+                onUp={() => nudge(t, -1)}
+                onDown={() => nudge(t, 1)}
+              />
+            )
+          })}
         </div>
         {filtered.length === 0 && (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white py-12 text-center text-sm text-slate-400">
@@ -293,12 +318,17 @@ export default function Tasks() {
   )
 }
 
-function TaskCard({ t, onClick, canUp, canDown, onUp, onDown }) {
+function TaskCard({ t, onClick, canUp, canDown, onUp, onDown, dragProps, dragging }) {
   const sm = statusMeta(t.status)
   const pm = priorityMeta(t.priority)
   const overdue = isOverdue(t)
   return (
-    <div className="flex items-start gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div
+      {...dragProps}
+      className={`flex select-none items-start gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${
+        dragging ? 'opacity-40' : ''
+      }`}
+    >
       {/* The card body is the tap target; the arrows sit outside it (a button
           can't be nested inside another button). */}
       <button onClick={onClick} className="flex min-w-0 flex-1 flex-col gap-2 text-left active:opacity-70">

@@ -12,7 +12,8 @@ export default function OrderArrows({ canUp, canDown, onUp, onDown, compact = fa
     fn()
   }
   return (
-    <span className="flex shrink-0 flex-col leading-none">
+    // draggable=false so pressing an arrow inside a draggable row never starts a drag
+    <span draggable={false} className="flex shrink-0 flex-col leading-none">
       <button type="button" onClick={press(onUp)} disabled={!canUp} className={cls} title="Move up">
         <ChevronUp size={compact ? 13 : 16} />
       </button>

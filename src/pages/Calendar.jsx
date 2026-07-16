@@ -9,6 +9,7 @@ import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import ActionSheet from '@/components/ActionSheet'
 import OrderArrows from '@/components/OrderArrows'
+import { useReorder } from '@/lib/useReorder'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 
 const WEEKDAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -138,7 +139,7 @@ function DayTasksPopover({ open, tasksByDay, openEditTask, setDragOver, onChipDr
 }
 
 export default function Calendar() {
-  const { tasks, openNewTask, openEditTask, rescheduleTask, reorderTask, moveWithin, loading } = useData()
+  const { tasks, openNewTask, openEditTask, rescheduleTask, reorderTask, moveWithin, commitOrder, loading } = useData()
 
   // Drop a task onto another task: reposition it before that task. If they're on
   // different days it also moves to that day; same day = pure reorder.
@@ -254,6 +255,7 @@ export default function Calendar() {
           openNewTask={openNewTask}
           openEditTask={openEditTask}
           moveWithin={moveWithin}
+          commitOrder={commitOrder}
         />
       )}
       {mode === 'week' && (
@@ -287,10 +289,13 @@ function weekTitle(cursor) {
 }
 
 /* ---------- Day ---------- */
-function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, moveWithin }) {
+function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, moveWithin, commitOrder }) {
   const items = tasksByDay[dayKey] || []
-  // Reorder within the day using arrows rather than dragging rows around.
-  const nudge = (t, dir) => moveWithin(t.id, dir, items.map((x) => x.id))
+  const ids = items.map((t) => t.id)
+  const byId = new Map(items.map((t) => [t.id, t]))
+  // Reorder within the day by arrows or by dragging (rows shift to make room).
+  const nudge = (t, dir) => moveWithin(t.id, dir, ids)
+  const sort = useReorder(ids, (newOrder, movedId) => commitOrder(movedId, newOrder))
   return (
     <div className="flex-1 overflow-y-auto p-4">
       <div className="mx-auto max-w-2xl">
@@ -306,17 +311,23 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, moveWithin }) 
           </button>
         </div>
         <div className="space-y-2">
-          {items.map((t, i) => (
-            <AgendaRow
-              key={t.id}
-              t={t}
-              onClick={() => openEditTask(t)}
-              canUp={i > 0}
-              canDown={i < items.length - 1}
-              onUp={() => nudge(t, -1)}
-              onDown={() => nudge(t, 1)}
-            />
-          ))}
+          {sort.order.map((id, i) => {
+            const t = byId.get(id)
+            if (!t) return null
+            return (
+              <AgendaRow
+                key={t.id}
+                t={t}
+                onClick={() => openEditTask(t)}
+                dragProps={sort.dragProps(t.id)}
+                dragging={sort.dragId === t.id}
+                canUp={i > 0}
+                canDown={i < sort.order.length - 1}
+                onUp={() => nudge(t, -1)}
+                onDown={() => nudge(t, 1)}
+              />
+            )
+          })}
           {items.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400">
               No tasks due this day.
@@ -328,12 +339,17 @@ function DayView({ dayKey, tasksByDay, openNewTask, openEditTask, moveWithin }) 
   )
 }
 
-function AgendaRow({ t, onClick, canUp, canDown, onUp, onDown }) {
+function AgendaRow({ t, onClick, canUp, canDown, onUp, onDown, dragProps, dragging }) {
   const sm = statusMeta(t.status)
   const pm = priorityMeta(t.priority)
   const time = t.startTime ? `${fmtTime(t.startTime)}${t.endTime ? ` – ${fmtTime(t.endTime)}` : ''}` : 'All day'
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
+    <div
+      {...dragProps}
+      className={`flex select-none items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 ${
+        dragging ? 'opacity-40' : ''
+      }`}
+    >
       <OrderArrows compact canUp={canUp} canDown={canDown} onUp={onUp} onDown={onDown} />
       {/* The row body is the tap target; the arrows sit outside it (a button
           can't be nested inside another button). */}
