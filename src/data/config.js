@@ -51,3 +51,10 @@ export const TONE = {
 
 export const statusMeta = (key) => STATUSES.find((s) => s.key === key) || STATUSES[0]
 export const priorityMeta = (key) => PRIORITIES.find((p) => p.key === key) || PRIORITIES[1]
+
+// Where a status sits in the task list: Pending on top, Completed at the bottom
+// (STATUSES is declared in that order). Unknown statuses sort last.
+export const statusRank = (key) => {
+  const i = STATUSES.findIndex((s) => s.key === key)
+  return i === -1 ? STATUSES.length : i
+}

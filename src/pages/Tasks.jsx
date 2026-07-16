@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Calendar as CalIcon, Repeat, GripVertical, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, Calendar as CalIcon, Repeat, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useData } from '@/data/store'
-import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta } from '@/data/config'
+import { STATUSES, PRIORITIES, DEPARTMENTS, COMPANIES, statusMeta, priorityMeta, statusRank } from '@/data/config'
 import Badge from '@/components/Badge'
 import Assignees from '@/components/Assignees'
 import Pagination from '@/components/Pagination'
@@ -10,10 +10,8 @@ import { isOverdue, medDate } from '@/lib/dates'
 import { collapseSeries } from '@/lib/series'
 
 export default function Tasks() {
-  const { tasks, openNewTask, openEditTask, reorderTask, loading } = useData()
+  const { tasks, openNewTask, openEditTask, moveInStatus, loading } = useData()
   const [q, setQ] = useState('')
-  const [dragId, setDragId] = useState(null)
-  const [overId, setOverId] = useState(null)
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
   const [department, setDepartment] = useState('all')
@@ -58,10 +56,48 @@ export default function Tasks() {
   // with a count, so pre-generated occurrences don't flood the list.
   const collapsed = useMemo(() => collapseSeries(filtered), [filtered])
 
-  const pageCount = Math.max(1, Math.ceil(collapsed.length / pageSize))
+  // Group by status — Pending on top, Completed at the bottom — and keep the
+  // manual order (sortIndex) inside each group. Completing a task drops it to
+  // the bottom on its own; unnumbered tasks fall to the end of their group,
+  // newest first.
+  const ordered = useMemo(
+    () =>
+      [...collapsed].sort((a, b) => {
+        const rank = statusRank(a.status) - statusRank(b.status)
+        if (rank) return rank
+        const ai = typeof a.sortIndex === 'number' ? a.sortIndex : Number.MAX_SAFE_INTEGER
+        const bi = typeof b.sortIndex === 'number' ? b.sortIndex : Number.MAX_SAFE_INTEGER
+        if (ai !== bi) return ai - bi
+        return (b.createdAt || '').localeCompare(a.createdAt || '')
+      }),
+    [collapsed],
+  )
+
+  // Each row's position within its own status group, so the arrows know when
+  // they've hit the top/bottom of that group.
+  const slot = useMemo(() => {
+    const seen = {}
+    const pos = {}
+    for (const t of ordered) {
+      seen[t.status] = seen[t.status] || 0
+      pos[t.id] = seen[t.status]++
+    }
+    return { pos, size: seen }
+  }, [ordered])
+
+  // Reorder against the whole filtered group, not just this page, so moving a
+  // row off the top of a page lands it on the previous one.
+  const nudge = (t, dir) =>
+    moveInStatus(
+      t.id,
+      dir,
+      ordered.filter((x) => x.status === t.status).map((x) => x.id),
+    )
+
+  const pageCount = Math.max(1, Math.ceil(ordered.length / pageSize))
   const paged = useMemo(
-    () => collapsed.slice((page - 1) * pageSize, page * pageSize),
-    [collapsed, page, pageSize],
+    () => ordered.slice((page - 1) * pageSize, page * pageSize),
+    [ordered, page, pageSize],
   )
 
   if (loading) return <div className="text-sm text-slate-400">Loading…</div>
@@ -104,7 +140,7 @@ export default function Tasks() {
 
           <div className="ml-auto flex items-center gap-3">
             <span className="text-sm text-slate-400">
-              {collapsed.length} row{collapsed.length === 1 ? '' : 's'}
+              {ordered.length} row{ordered.length === 1 ? '' : 's'}
             </span>
             <button
               onClick={() => openNewTask()}
@@ -157,40 +193,17 @@ export default function Tasks() {
               return (
                 <tr
                   key={t.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/task-id', t.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                    setDragId(t.id)
-                  }}
-                  onDragEnd={() => {
-                    setDragId(null)
-                    setOverId(null)
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    if (overId !== t.id) setOverId(t.id)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const id = e.dataTransfer.getData('text/task-id')
-                    setOverId(null)
-                    setDragId(null)
-                    if (id && id !== t.id) {
-                      const moving = tasks.find((x) => x.id === id)
-                      reorderTask(id, moving?.status, t.id)
-                    }
-                  }}
                   onClick={() => openEditTask(t)}
-                  className={`cursor-pointer transition-colors ${dragId === t.id ? 'opacity-40' : ''} ${
-                    overId === t.id && dragId && dragId !== t.id ? 'bg-brand-50' : 'hover:bg-slate-50'
-                  }`}
+                  className="cursor-pointer transition-colors hover:bg-slate-50"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <GripVertical
-                        size={14}
-                        className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+                      <OrderArrows
+                        compact
+                        canUp={slot.pos[t.id] > 0}
+                        canDown={slot.pos[t.id] < slot.size[t.status] - 1}
+                        onUp={() => nudge(t, -1)}
+                        onDown={() => nudge(t, 1)}
                       />
                       <span className="font-medium text-slate-800">{t.title}</span>
                       {t.recurring && (
@@ -243,7 +256,7 @@ export default function Tasks() {
         <Pagination
           page={page}
           pageCount={pageCount}
-          total={collapsed.length}
+          total={ordered.length}
           pageSize={pageSize}
           onPage={setPage}
           onPageSize={setPageSize}
@@ -254,7 +267,15 @@ export default function Tasks() {
       <div className="space-y-2 lg:hidden">
         <div className="grid gap-2 sm:grid-cols-2">
           {paged.map((t) => (
-            <TaskCard key={t.id} t={t} onClick={() => openEditTask(t)} />
+            <TaskCard
+              key={t.id}
+              t={t}
+              onClick={() => openEditTask(t)}
+              canUp={slot.pos[t.id] > 0}
+              canDown={slot.pos[t.id] < slot.size[t.status] - 1}
+              onUp={() => nudge(t, -1)}
+              onDown={() => nudge(t, 1)}
+            />
           ))}
         </div>
         {filtered.length === 0 && (
@@ -262,12 +283,12 @@ export default function Tasks() {
             No tasks match your filters.
           </div>
         )}
-        {collapsed.length > pageSize && (
+        {ordered.length > pageSize && (
           <div className="rounded-xl border border-slate-200 bg-white">
             <Pagination
               page={page}
               pageCount={pageCount}
-              total={collapsed.length}
+              total={ordered.length}
               pageSize={pageSize}
               onPage={setPage}
               onPageSize={setPageSize}
@@ -279,34 +300,58 @@ export default function Tasks() {
   )
 }
 
-function TaskCard({ t, onClick }) {
+// Reordering without drag-and-drop: nudge a task up or down within its own
+// status group. Stops propagation so it doesn't open the task editor.
+function OrderArrows({ canUp, canDown, onUp, onDown, compact = false }) {
+  const cls = `rounded ${
+    compact ? 'p-0.5' : 'p-1.5'
+  } text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-400`
+  const press = (fn) => (e) => {
+    e.stopPropagation()
+    fn()
+  }
+  return (
+    <span className="flex shrink-0 flex-col leading-none">
+      <button type="button" onClick={press(onUp)} disabled={!canUp} className={cls} title="Move up">
+        <ChevronUp size={compact ? 13 : 16} />
+      </button>
+      <button type="button" onClick={press(onDown)} disabled={!canDown} className={cls} title="Move down">
+        <ChevronDown size={compact ? 13 : 16} />
+      </button>
+    </span>
+  )
+}
+
+function TaskCard({ t, onClick, canUp, canDown, onUp, onDown }) {
   const sm = statusMeta(t.status)
   const pm = priorityMeta(t.priority)
   const overdue = isOverdue(t)
   return (
-    <button
-      onClick={onClick}
-      className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm active:bg-slate-50"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex items-center gap-1.5 font-medium text-slate-800">
-          {t.title}
-          {t.recurring && <Repeat size={12} className="shrink-0 text-brand-500" />}
-        </span>
-        <Badge tone={pm.tone}>{pm.label}</Badge>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-        <Badge tone={sm.tone} dot>{sm.label}</Badge>
-        {t.company && <span>{t.company}</span>}
-        {t.dueDate && (
-          <span className={`inline-flex items-center gap-1 ${overdue ? 'text-rose-600' : ''}`}>
-            <CalIcon size={12} />
-            {medDate(t.dueDate)}
+    <div className="flex items-start gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      {/* The card body is the tap target; the arrows sit outside it (a button
+          can't be nested inside another button). */}
+      <button onClick={onClick} className="flex min-w-0 flex-1 flex-col gap-2 text-left active:opacity-70">
+        <span className="flex w-full items-start justify-between gap-2">
+          <span className="flex items-center gap-1.5 font-medium text-slate-800">
+            {t.title}
+            {t.recurring && <Repeat size={12} className="shrink-0 text-brand-500" />}
           </span>
-        )}
-      </div>
-      <Assignees ids={t.assignees} />
-    </button>
+          <Badge tone={pm.tone}>{pm.label}</Badge>
+        </span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <Badge tone={sm.tone} dot>{sm.label}</Badge>
+          {t.company && <span>{t.company}</span>}
+          {t.dueDate && (
+            <span className={`inline-flex items-center gap-1 ${overdue ? 'text-rose-600' : ''}`}>
+              <CalIcon size={12} />
+              {medDate(t.dueDate)}
+            </span>
+          )}
+        </span>
+        <Assignees ids={t.assignees} />
+      </button>
+      <OrderArrows canUp={canUp} canDown={canDown} onUp={onUp} onDown={onDown} />
+    </div>
   )
 }
 

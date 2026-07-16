@@ -403,6 +403,64 @@ export function DataProvider({ children }) {
 
   const moveTask = useCallback((id, status) => updateTask(id, { status }), [updateTask])
 
+  // Move a task one slot up (dir -1) or down (dir +1) among the tasks that share
+  // its status — the Tasks list's arrow controls, an alternative to dragging.
+  // `groupIds` is that status group in the order the user currently sees it, so
+  // the move always matches the screen (filters and paging included).
+  //
+  // Fast path: slot a fractional sortIndex between the new neighbours and write
+  // that one row. Fallback (a neighbour is unnumbered, or the gap is used up):
+  // renumber the group by position, writing only the rows that actually moved.
+  const moveInStatus = useCallback(
+    (id, dir, groupIds) => {
+      const i = groupIds.indexOf(id)
+      const j = i + dir
+      if (i === -1 || j < 0 || j >= groupIds.length) return Promise.resolve()
+
+      const rest = groupIds.filter((x) => x !== id)
+      const indexOf = (tid) => {
+        const t = tasks.find((x) => x.id === tid)
+        return t && typeof t.sortIndex === 'number' ? t.sortIndex : null
+      }
+      const above = rest[j - 1]
+      const below = rest[j]
+      const ai = above ? indexOf(above) : null
+      const bi = below ? indexOf(below) : null
+
+      let newIndex = null
+      if (ai !== null && bi !== null) {
+        if (bi - ai > 1e-6) newIndex = (ai + bi) / 2
+      } else if (ai !== null && !below) newIndex = ai + 1
+      else if (bi !== null && !above) newIndex = bi - 1
+
+      const prev = tasks
+      const changes =
+        newIndex !== null
+          ? [{ id, sortIndex: newIndex }]
+          : [...rest.slice(0, j), id, ...rest.slice(j)]
+              .map((tid, pos) => ({ id: tid, sortIndex: pos }))
+              .filter(({ id: tid, sortIndex }) => tasks.find((x) => x.id === tid)?.sortIndex !== sortIndex)
+
+      if (!changes.length) return Promise.resolve()
+      const next = new Map(changes.map((c) => [c.id, c.sortIndex]))
+      setTasks((ts) => ts.map((t) => (next.has(t.id) ? { ...t, sortIndex: next.get(t.id) } : t)))
+
+      setBusyCount((n) => n + 1)
+      ;(async () => {
+        try {
+          await Promise.all(changes.map((c) => backend.update('tasks', c.id, { sortIndex: c.sortIndex })))
+        } catch {
+          setTasks(prev)
+          toast.error('Couldn’t reorder the tasks')
+        } finally {
+          setBusyCount((n) => n - 1)
+        }
+      })()
+      return Promise.resolve()
+    },
+    [tasks, toast],
+  )
+
   // Drag-to-reschedule on the calendar. Optimistic (snaps back on failure).
   // Single-day tasks move whole; multi-day keep their start (clamped if the
   // new due date would fall before it).
@@ -609,6 +667,7 @@ export function DataProvider({ children }) {
       updateSeries,
       deleteSeries,
       moveTask,
+      moveInStatus,
       reorderTask,
       rescheduleTask,
       createProject,
@@ -635,6 +694,7 @@ export function DataProvider({ children }) {
       updateSeries,
       deleteSeries,
       moveTask,
+      moveInStatus,
       reorderTask,
       rescheduleTask,
       createProject,
