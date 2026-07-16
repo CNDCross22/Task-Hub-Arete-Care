@@ -68,8 +68,14 @@ function migrateTasks(raw) {
   const tasks = raw.map((t) => {
     let next = t
     if (next.status === 'completed' && !next.completedAt) {
-      next = { ...next, completedAt: next.dueDate || next.createdAt }
-      changed = true
+      // Only claim a change when there's an actual date to write. Otherwise
+      // completedAt would be set to undefined, never persist, and leave
+      // `changed` true on every single load — re-running the back-fill forever.
+      const stamp = next.dueDate || next.createdAt
+      if (stamp) {
+        next = { ...next, completedAt: stamp }
+        changed = true
+      }
     }
     if (next.recurring && !next.seriesId) {
       next = { ...next, seriesId: uid('s') }
@@ -78,6 +84,24 @@ function migrateTasks(raw) {
     return next
   })
   return { tasks, changed }
+}
+
+// Persist just the back-filled fields, one targeted update per affected row.
+// NEVER use replace() for this: for tasks it re-stamps EVERY row's sortIndex by
+// array position, so this fire-and-forget write could land right after someone
+// reordered and silently undo it (the reorder looks fine until you reload).
+function backfillTasks(before, after) {
+  const prev = new Map(before.map((t) => [t.id, t]))
+  const writes = []
+  for (const t of after) {
+    const was = prev.get(t.id)
+    if (!was) continue
+    const patch = {}
+    if (t.completedAt && t.completedAt !== was.completedAt) patch.completedAt = t.completedAt
+    if (t.seriesId && t.seriesId !== was.seriesId) patch.seriesId = t.seriesId
+    if (Object.keys(patch).length) writes.push(backend.update('tasks', t.id, patch))
+  }
+  return Promise.all(writes).catch(() => {})
 }
 
 const DataContext = createContext(null)
@@ -149,7 +173,7 @@ export function DataProvider({ children }) {
         setTasks(migrated)
         setMembers(db.members || [])
         setLoading(false)
-        if (changed) backend.replace('tasks', migrated).catch(() => {})
+        if (changed) backfillTasks(db.tasks || [], migrated)
       })
       .catch((e) => {
         // A failed first fetch must not leave the app stuck on the loading screen.
@@ -449,9 +473,11 @@ export function DataProvider({ children }) {
       ;(async () => {
         try {
           await Promise.all(changes.map((c) => backend.update('tasks', c.id, { sortIndex: c.sortIndex })))
-        } catch {
+        } catch (e) {
           setTasks(prev)
-          toast.error('Couldn’t reorder the tasks')
+          // Surface the real reason — a generic message here hides whether the
+          // save was rejected, blocked, or never reached the server at all.
+          toast.error(e?.message ? `Couldn’t reorder: ${e.message}` : 'Couldn’t reorder the tasks')
         } finally {
           setBusyCount((n) => n - 1)
         }
